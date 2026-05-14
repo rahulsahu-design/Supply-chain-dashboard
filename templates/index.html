@@ -201,24 +201,79 @@
     <div class="page-header">
       <div>
         <h2>Undelivered Shipments</h2>
-        <div class="subtitle">Rows in <span style="color:#e53e3e;font-weight:700;">red</span> are overdue (21+ days)</div>
+        <div class="subtitle">Active shipments pending delivery — excludes Delivered, RTO &amp; Abandoned</div>
       </div>
     </div>
     <div class="content-area">
-      <div class="kpi-grid" id="undel-kpis" style="margin-bottom:20px;"></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>AWB</th><th>Channel</th><th>Transporter</th>
-              <th>Pickup Date</th><th>Expected Delivery</th>
-              <th>Ageing (days)</th><th>Bucket</th><th>Delay Days</th>
-              <th>Status</th><th>Product</th><th>Qty</th>
-            </tr>
-          </thead>
-          <tbody id="undel-tbody"><tr><td colspan="11" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
-        </table>
+
+      <!-- Filter bar -->
+      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <label>Year</label>
+        <select id="undel-year"><option value="All">All Years</option></select>
+
+        <label>Channel</label>
+        <div class="ms-dropdown" id="ms-undel-channel" data-all-label="All Channels">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-undel-channel')">
+            <span class="ms-label">All Channels</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-undel-channel',this)" checked> All</label>
+            <label class="ms-option"><input type="checkbox" value="Amazon" onchange="msItemToggle('ms-undel-channel',this)"> Amazon</label>
+            <label class="ms-option"><input type="checkbox" value="TikTok" onchange="msItemToggle('ms-undel-channel',this)"> TikTok</label>
+            <label class="ms-option"><input type="checkbox" value="Shipbob" onchange="msItemToggle('ms-undel-channel',this)"> Shipbob</label>
+          </div>
+        </div>
+
+        <label>Exp Del Week</label>
+        <div class="ms-dropdown" id="ms-undel-exp-week" data-all-label="All Weeks">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-undel-exp-week')">
+            <span class="ms-label">All Weeks</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel" id="ms-undel-exp-week-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-undel-exp-week',this)" checked> All</label>
+          </div>
+        </div>
+
+        <label>Exp Del From</label>
+        <input type="date" id="undel-from">
+        <label>To</label>
+        <input type="date" id="undel-to">
+        <button class="btn btn-primary" onclick="loadUndelivered()">Apply</button>
+        <button class="gf-clear-btn" onclick="clearUndeliveredFilters()">✕ Clear</button>
       </div>
+
+      <!-- KPI row -->
+      <div class="kpi-grid" id="undel-kpis" style="margin-bottom:20px;"></div>
+
+      <!-- Pivot table -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid #e2e8f0;">
+          <span style="font-size:12px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;">SUM of Qty Pending — Channel × Expected Delivery Date</span>
+          <span id="undel-pivot-updated-label" style="font-size:11px;color:#718096;"></span>
+        </div>
+        <div id="undel-pivot-wrap" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <!-- Shipment detail (collapsible) -->
+      <details>
+        <summary class="detail-toggle">▶ Shipment Detail Rows</summary>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>AWB</th><th>Channel</th><th>Transporter</th>
+                <th>Pickup Date</th><th>Expected Delivery</th>
+                <th>Ageing (days)</th><th>Bucket</th><th>Delay Days</th>
+                <th>Status</th><th>Product</th><th>Qty</th>
+              </tr>
+            </thead>
+            <tbody id="undel-tbody"><tr><td colspan="11" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </details>
+
     </div>
   </div>
 
@@ -425,6 +480,20 @@ async function loadFilterOptions() {
   const panel = document.getElementById('ms-del-week-panel');
   opts.del_weeks.forEach(w => {
     panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-del-week',this)"> W${w}</label>`;
+  });
+
+  // Populate undelivered year dropdown
+  const undelYearSel = document.getElementById('undel-year');
+  (opts.exp_del_years || []).forEach(y => {
+    const o = document.createElement('option');
+    o.value = o.textContent = y;
+    undelYearSel.appendChild(o);
+  });
+
+  // Populate undelivered expected-delivery-week multi-select
+  const expWeekPanel = document.getElementById('ms-undel-exp-week-panel');
+  (opts.exp_del_weeks || []).forEach(w => {
+    expWeekPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-undel-exp-week',this)"> W${w}</label>`;
   });
 }
 
@@ -680,17 +749,20 @@ function clearDeliveredFilters() {
   loadDelivered();
 }
 
-function renderPivot(data) {
-  const wrap = document.getElementById('pivot-wrap');
+function renderPivotTo(wrapId, updatedLabelId, data) {
+  const wrap = document.getElementById(wrapId);
   const { dates, rows, grand_totals, overall_total } = data;
 
   if (!dates.length) {
-    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:#718096;font-size:13px;">No delivery data for the selected filters / date range</div>';
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:#718096;font-size:13px;">No data for the selected filters / date range</div>';
+    if (updatedLabelId) document.getElementById(updatedLabelId).textContent = '';
     return;
   }
 
-  document.getElementById('pivot-updated-label').textContent =
-    'Updated: ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+  if (updatedLabelId) {
+    document.getElementById(updatedLabelId).textContent =
+      'Updated: ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+  }
 
   let html = '<table class="pivot-table"><thead><tr>';
   html += '<th>Channel / Product</th>';
@@ -698,9 +770,7 @@ function renderPivot(data) {
   html += '<th class="pivot-col-total">Total</th></tr></thead><tbody>';
 
   rows.forEach(chRow => {
-    const chId = chRow.channel.replace(/[^a-zA-Z0-9]/g, '_');
-
-    // Channel header row
+    const chId = chRow.channel.replace(/[^a-zA-Z0-9]/g, '_') + '_' + wrapId;
     html += `<tr class="pivot-ch-row" data-chid="${chId}">`;
     html += `<td><button class="pivot-toggle" onclick="togglePivotCh('${chId}')">−</button><strong>${chRow.channel}</strong></td>`;
     dates.forEach(d => {
@@ -709,10 +779,9 @@ function renderPivot(data) {
     });
     html += `<td class="pivot-col-total"><strong>${chRow.channel_total.toLocaleString()}</strong></td></tr>`;
 
-    // Product rows
     chRow.products.forEach(prod => {
       html += `<tr class="pivot-prod-row" data-chid="${chId}">`;
-      html += `<td>${prod.product}</td>`;
+      html += `<td style="padding-left:24px;">${prod.product}</td>`;
       dates.forEach(d => {
         const v = prod.values[d];
         html += `<td>${v != null ? v.toLocaleString() : ''}</td>`;
@@ -721,7 +790,6 @@ function renderPivot(data) {
     });
   });
 
-  // Grand total
   html += '<tr class="pivot-total-row"><td><strong>Grand Total</strong></td>';
   dates.forEach(d => {
     const v = grand_totals[d];
@@ -731,6 +799,10 @@ function renderPivot(data) {
 
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+function renderPivot(data) {
+  renderPivotTo('pivot-wrap', 'pivot-updated-label', data);
 }
 
 function togglePivotCh(chId) {
@@ -743,21 +815,48 @@ function togglePivotCh(chId) {
 
 // ── View 3: Undelivered ──────────────────────────────────────────────────
 async function loadUndelivered() {
-  const res = await apiFetch('/api/undelivered');
-  const rows = await res.json();
+  const channels    = getMsValues('ms-undel-channel');
+  const expDelWeeks = getMsValues('ms-undel-exp-week');
+  const from  = document.getElementById('undel-from').value;
+  const to    = document.getElementById('undel-to').value;
+  const year  = document.getElementById('undel-year').value;
 
-  const overdue = rows.filter(r => r.is_overdue).length;
+  const extra = new URLSearchParams();
+  if (channels.length)    extra.set('channel', channels.join(','));
+  if (expDelWeeks.length) extra.set('exp_del_week', expDelWeeks.join(','));
+  if (from) extra.set('from', from);
+  if (to)   extra.set('to', to);
+  if (year && year !== 'All') extra.set('undel_year', year);
+
+  const pivotExtra = new URLSearchParams();
+  if (channels.length)    pivotExtra.set('channels', channels.join(','));
+  if (expDelWeeks.length) pivotExtra.set('exp_del_weeks', expDelWeeks.join(','));
+  if (from) pivotExtra.set('from', from);
+  if (to)   pivotExtra.set('to', to);
+  if (year && year !== 'All') pivotExtra.set('undel_year', year);
+
+  const [res, pivotRes] = await Promise.all([
+    apiFetch('/api/undelivered', extra),
+    apiFetch('/api/undelivered-pivot', pivotExtra),
+  ]);
+  const rows      = await res.json();
+  const pivotData = await pivotRes.json();
+
+  // KPIs
   const byChannel = {};
-  rows.forEach(r => { byChannel[r.Channel] = (byChannel[r.Channel] || 0) + 1; });
-
+  let totalQty = 0;
+  rows.forEach(r => {
+    byChannel[r.Channel] = (byChannel[r.Channel] || 0) + 1;
+    totalQty += Number(r['Qty Sent']) || 0;
+  });
   document.getElementById('undel-kpis').innerHTML = `
     <div class="kpi-card accent-blue">
-      <div class="kpi-label">Total Undelivered</div>
+      <div class="kpi-label">Total Pending Shipments</div>
       <div class="kpi-value">${fmtNum(rows.length)}</div>
     </div>
-    <div class="kpi-card accent-red">
-      <div class="kpi-label">Overdue (21+ days)</div>
-      <div class="kpi-value">${fmtNum(overdue)}</div>
+    <div class="kpi-card accent-orange">
+      <div class="kpi-label">Total Pending Units</div>
+      <div class="kpi-value">${fmtNum(totalQty)}</div>
     </div>
     ${Object.entries(byChannel).map(([ch, cnt]) => `
     <div class="kpi-card">
@@ -766,14 +865,21 @@ async function loadUndelivered() {
     </div>`).join('')}
   `;
 
-  const tbody = document.getElementById('undel-tbody');
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No undelivered shipments</td></tr>'; return; }
+  // Pivot
+  renderPivotTo('undel-pivot-wrap', 'undel-pivot-updated-label', pivotData);
 
-  // Sort: overdue first
-  rows.sort((a, b) => (b.is_overdue ? 1 : 0) - (a.is_overdue ? 1 : 0) || (b.Ageing || 0) - (a.Ageing || 0));
+  // Detail table
+  const tbody = document.getElementById('undel-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No undelivered shipments for selected filters</td></tr>';
+    return;
+  }
+
+  rows.sort((a, b) => (b['Ageing'] || 0) - (a['Ageing'] || 0));
 
   const statusKey = 'Current Status - Ship partner portal';
-  tbody.innerHTML = rows.map(r => `<tr class="${r.is_overdue ? 'overdue' : ''}">
+  const isOverdue = r => r['Ageing Bucket'] === '21-30' || r['Ageing Bucket'] === '30+';
+  tbody.innerHTML = rows.map(r => `<tr class="${isOverdue(r) ? 'overdue' : ''}">
     <td>${r['Shipment AWB'] || '—'}</td>
     <td>${r['Channel'] || '—'}</td>
     <td>${r['Transporter'] || '—'}</td>
@@ -786,6 +892,20 @@ async function loadUndelivered() {
     <td>${r['Product Name'] || '—'}</td>
     <td>${fmtNum(r['Qty Sent'])}</td>
   </tr>`).join('');
+}
+
+function clearUndeliveredFilters() {
+  ['ms-undel-channel', 'ms-undel-exp-week'].forEach(id => {
+    const el = document.getElementById(id);
+    el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    const allCb = el.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel(id);
+  });
+  document.getElementById('undel-from').value = '';
+  document.getElementById('undel-to').value = '';
+  document.getElementById('undel-year').value = 'All';
+  loadUndelivered();
 }
 
 // ── View 4: TAT Analysis ─────────────────────────────────────────────────

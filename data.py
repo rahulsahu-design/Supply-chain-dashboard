@@ -18,6 +18,7 @@ SCOPES = [
 STATUS_COL = "Current Status - Ship partner portal"
 DELIVERED_STATUSES = {"Delivered"}
 OVERDUE_BUCKETS = {"21-30", "30+"}
+EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "Abandon"}
 
 _cache = {"df": None, "fetched_at": None}
 CACHE_TTL_SECONDS = 300
@@ -105,7 +106,20 @@ def get_filter_options(df: pd.DataFrame) -> dict:
         [w for w in del_weeks_raw if w.isdigit()],
         key=lambda x: int(x)
     )
-    return {"years": years, "months": months, "weeks": weeks, "del_weeks": del_weeks}
+    # Expected delivery weeks/years (from Expected Delivery Date column)
+    exp_del_weeks = []
+    exp_del_years = []
+    if "Expected Delivery Date" in df.columns:
+        exp_dates = df["Expected Delivery Date"].dropna()
+        if not exp_dates.empty:
+            weeks_iso = exp_dates.dt.isocalendar().week.dropna().astype(int).unique().tolist()
+            exp_del_weeks = sorted([str(w) for w in weeks_iso])
+            exp_del_years = sorted(exp_dates.dt.year.dropna().astype(int).unique().tolist())
+    return {
+        "years": years, "months": months, "weeks": weeks, "del_weeks": del_weeks,
+        "exp_del_weeks": exp_del_weeks,
+        "exp_del_years": [str(y) for y in exp_del_years],
+    }
 
 
 def apply_filters(df: pd.DataFrame, year=None, month=None, week=None,
@@ -195,6 +209,22 @@ def _filter_del_week(d, del_week):
             return d
         return d[d["Delivery Date Week Num"].astype(str).str.strip().isin([str(w) for w in del_week])]
     return d[d["Delivery Date Week Num"].astype(str).str.strip() == str(del_week)] if del_week != "All" else d
+
+
+def _filter_exp_del_week(d, exp_del_week):
+    if not exp_del_week or "Expected Delivery Date" not in d.columns:
+        return d
+    week_nums = d["Expected Delivery Date"].dt.isocalendar().week.astype(str)
+    if isinstance(exp_del_week, list):
+        if "All" in exp_del_week:
+            return d
+        return d[week_nums.isin([str(w) for w in exp_del_week])]
+    return d[week_nums == str(exp_del_week)] if exp_del_week != "All" else d
+
+
+def _active_undelivered_mask(df):
+    status = df[STATUS_COL].str.strip()
+    return ~status.isin(EXCLUDED_UNDELIVERED_STATUSES) & (status != "")
 
 
 def delivered_shipments(df: pd.DataFrame, channel=None, del_week=None, date_from=None, date_to=None) -> list:
@@ -312,20 +342,101 @@ def delivered_pivot(df: pd.DataFrame, channels=None, del_weeks=None, date_from=N
     }
 
 
-def undelivered_shipments(df: pd.DataFrame) -> list:
-    d = df[~df["is_delivered"]].copy()
+def undelivered_shipments(df: pd.DataFrame, channel=None, exp_del_week=None,
+                          date_from=None, date_to=None, year=None) -> list:
+    d = df[_active_undelivered_mask(df)].copy()
+    if year and year != "All":
+        try:
+            target = int(float(str(year).strip()))
+            d = d[d["Expected Delivery Date"].dt.year == target]
+        except (ValueError, TypeError):
+            pass
+    d = _filter_channel(d, channel)
+    d = _filter_exp_del_week(d, exp_del_week)
+    if date_from:
+        d = d[d["Expected Delivery Date"].dt.date >= pd.to_datetime(date_from).date()]
+    if date_to:
+        d = d[d["Expected Delivery Date"].dt.date <= pd.to_datetime(date_to).date()]
     cols = [
         "Shipment AWB", "Channel", "Transporter", "Pick up Date",
         "Expected Delivery Date", "Ageing", "Ageing Bucket",
-        "Delay Days", STATUS_COL, "Product Name", "Qty Sent", "is_overdue",
+        "Delay Days", STATUS_COL, "Product Name", "Qty Sent",
     ]
     cols = [c for c in cols if c in d.columns]
     out = d[cols].copy()
     for dc in ["Pick up Date", "Expected Delivery Date"]:
         if dc in out.columns:
             out[dc] = out[dc].dt.strftime("%d/%m/%Y").fillna("")
-    out["is_overdue"] = out["is_overdue"].astype(bool)
     return out.fillna("").to_dict(orient="records")
+
+
+def undelivered_pivot(df: pd.DataFrame, channels=None, exp_del_weeks=None,
+                      date_from=None, date_to=None, year=None) -> dict:
+    mask = _active_undelivered_mask(df)
+    d = df[mask & df["Expected Delivery Date"].notna() & df["Qty Sent"].notna()].copy()
+    if year and year != "All":
+        try:
+            target = int(float(str(year).strip()))
+            d = d[d["Expected Delivery Date"].dt.year == target]
+        except (ValueError, TypeError):
+            pass
+    d = _filter_channel(d, channels)
+    d = _filter_exp_del_week(d, exp_del_weeks)
+    if date_from:
+        d = d[d["Expected Delivery Date"].dt.date >= pd.to_datetime(date_from).date()]
+    if date_to:
+        d = d[d["Expected Delivery Date"].dt.date <= pd.to_datetime(date_to).date()]
+
+    if d.empty:
+        return {"dates": [], "rows": [], "grand_totals": {}, "overall_total": 0}
+
+    def fmt_date(dt):
+        return f"{dt.day} {dt.strftime('%b %Y')}"
+
+    d = d.copy()
+    d["_date_obj"] = d["Expected Delivery Date"].dt.date
+    d["_date_label"] = d["Expected Delivery Date"].apply(lambda x: fmt_date(x))
+
+    unique_dates = sorted(d["_date_obj"].unique())
+    date_labels = [fmt_date(dt) for dt in unique_dates]
+
+    channels_in_data = d["Channel"].dropna().unique().tolist()
+    channel_order = ["Amazon", "TikTok", "Shipbob"]
+    ordered = [c for c in channel_order if c in channels_in_data]
+    others = [c for c in channels_in_data if c not in channel_order]
+    all_channels = ordered + others
+
+    result_rows = []
+    for ch in all_channels:
+        ch_df = d[d["Channel"] == ch]
+        if ch_df.empty:
+            continue
+        product_rows = []
+        for prod in ch_df["Product Name"].dropna().unique():
+            prod_df = ch_df[ch_df["Product Name"] == prod]
+            values = {dl: int(qty) for dl, qty in prod_df.groupby("_date_label")["Qty Sent"].sum().items()}
+            total = sum(values.values())
+            if total > 0:
+                product_rows.append({"product": str(prod), "values": values, "total": total})
+        product_rows.sort(key=lambda x: x["total"], reverse=True)
+        ch_totals = {dl: int(ch_df[ch_df["_date_label"] == dl]["Qty Sent"].sum())
+                     for dl in date_labels if ch_df[ch_df["_date_label"] == dl]["Qty Sent"].sum() > 0}
+        result_rows.append({
+            "channel": ch,
+            "products": product_rows,
+            "subtotals": ch_totals,
+            "channel_total": int(ch_df["Qty Sent"].sum()),
+        })
+
+    grand_totals = {dl: int(d[d["_date_label"] == dl]["Qty Sent"].sum())
+                    for dl in date_labels if d[d["_date_label"] == dl]["Qty Sent"].sum() > 0}
+
+    return {
+        "dates": date_labels,
+        "rows": result_rows,
+        "grand_totals": grand_totals,
+        "overall_total": int(d["Qty Sent"].sum()),
+    }
 
 
 def tat_analysis(df: pd.DataFrame, days=7) -> list:
