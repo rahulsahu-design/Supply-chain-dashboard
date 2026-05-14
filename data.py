@@ -26,7 +26,7 @@ CACHE_TTL_SECONDS = 300
 def _connect():
     b64 = os.environ.get("GOOGLE_CREDS_B64")
     if b64:
-        b64 = b64.strip()  # remove any accidental whitespace/newlines
+        b64 = "".join(b64.split())  # remove ALL whitespace including internal newlines
         b64 += "=" * (-len(b64) % 4)  # fix padding if missing
         info = json.loads(base64.b64decode(b64).decode("utf-8"))
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
