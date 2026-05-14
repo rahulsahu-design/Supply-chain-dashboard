@@ -456,9 +456,12 @@ function clearFilters() {
   reloadCurrentView();
 }
 
+let _forceRefresh = false;
+
 function apiFetch(path, extraParams) {
   const p = getFilterParams();
   if (extraParams) extraParams.forEach((v, k) => p.set(k, v));
+  if (_forceRefresh) p.set('refresh', '1');
   const sep = path.includes('?') ? '&' : '?';
   return fetch(path + (p.toString() ? sep + p.toString() : ''));
 }
@@ -573,19 +576,19 @@ navItems.forEach(item => {
 // ── Load dispatcher ──────────────────────────────────────────────────────
 function reloadCurrentView() {
   const active = document.querySelector('.nav-item.active');
-  if (active) loadView(active.dataset.view, true);
+  if (active) return loadView(active.dataset.view, true);
 }
 
 function loadView(view, force) {
   switch (view) {
-    case 'daily-summary':  loadSummary(); break;
-    case 'delivered':      loadDelivered(); break;
-    case 'undelivered':    loadUndelivered(); break;
-    case 'tat':            loadTAT(); break;
-    case 'ageing':         loadAgeing(); break;
-    case 'scorecard':      loadScorecard(); break;
-    case 'channel-health': loadChannelHealth(); break;
-    case 'trends':         loadTrends(); break;
+    case 'daily-summary':  return loadSummary();
+    case 'delivered':      return loadDelivered();
+    case 'undelivered':    return loadUndelivered();
+    case 'tat':            return loadTAT();
+    case 'ageing':         return loadAgeing();
+    case 'scorecard':      return loadScorecard();
+    case 'channel-health': return loadChannelHealth();
+    case 'trends':         return loadTrends();
   }
 }
 
@@ -593,8 +596,9 @@ async function refreshData() {
   const btn = document.getElementById('refresh-btn');
   btn.disabled = true;
   btn.textContent = '↻ Fetching…';
-  await fetch('/api/daily-summary?refresh=1'); // force server to re-fetch from Google Sheets
-  reloadCurrentView();
+  _forceRefresh = true;
+  await reloadCurrentView();
+  _forceRefresh = false;
   btn.textContent = '↻ Refresh Data';
   btn.disabled = false;
   document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
