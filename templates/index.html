@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supply Chain Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <h1>Supply Chain</h1>
+    <span>Operations Dashboard</span>
+  </div>
+
+  <div class="sidebar-section-label">Overview</div>
+  <div class="nav-item active" data-view="daily-summary">
+    <span class="nav-icon">📊</span> Daily Summary
+  </div>
+
+  <div class="sidebar-section-label">Shipments</div>
+  <div class="nav-item" data-view="delivered">
+    <span class="nav-icon">✅</span> Delivered
+  </div>
+  <div class="nav-item" data-view="undelivered">
+    <span class="nav-icon">🚚</span> Undelivered
+  </div>
+  <div class="nav-item" data-view="ageing">
+    <span class="nav-icon">⏳</span> Ageing
+  </div>
+
+  <div class="sidebar-section-label">Performance</div>
+  <div class="nav-item" data-view="tat">
+    <span class="nav-icon">⚡</span> TAT Analysis
+  </div>
+  <div class="nav-item" data-view="scorecard">
+    <span class="nav-icon">🏆</span> Transporter Scorecard
+  </div>
+
+  <div class="sidebar-section-label">Channels</div>
+  <div class="nav-item" data-view="channel-health">
+    <span class="nav-icon">🏪</span> Channel Health
+  </div>
+  <div class="nav-item" data-view="trends">
+    <span class="nav-icon">📈</span> Trends
+  </div>
+
+  <div class="sidebar-footer">
+    <button id="refresh-btn" onclick="refreshData()">↻ Refresh Data</button>
+    <div class="last-updated" id="last-updated">Not yet loaded</div>
+  </div>
+</nav>
+
+<!-- ── Main ─────────────────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- ── Global Filter Bar ────────────────────────────────────────────── -->
+  <div id="global-filter-bar">
+    <div class="gf-group">
+      <label>Year</label>
+      <select id="gf-year"><option value="All">All</option></select>
+    </div>
+    <div class="gf-group">
+      <label>Month</label>
+      <select id="gf-month"><option value="All">All</option></select>
+    </div>
+    <div class="gf-group">
+      <label>Pickup Week</label>
+      <select id="gf-week"><option value="All">All</option></select>
+    </div>
+    <div class="gf-divider"></div>
+    <div class="gf-group">
+      <label>Pickup From</label>
+      <input type="date" id="gf-date-from">
+    </div>
+    <div class="gf-group">
+      <label>Pickup To</label>
+      <input type="date" id="gf-date-to">
+    </div>
+    <button class="gf-clear-btn" onclick="clearFilters()">✕ Clear</button>
+    <div id="gf-active-badge" style="display:none;">
+      <span class="gf-filtered-pill">Filtered</span>
+    </div>
+  </div>
+
+  <!-- ── View: Daily Summary ──────────────────────────────────────────── -->
+  <div class="view active" id="view-daily-summary">
+    <div class="page-header">
+      <div>
+        <h2>Daily Operations Summary</h2>
+        <div class="subtitle" id="summary-date">Loading…</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="kpi-grid" id="summary-kpis">
+        <div class="loading-state"><div class="spinner"></div> Loading…</div>
+      </div>
+      <div class="chart-row">
+        <div class="card">
+          <h3>Status Breakdown</h3>
+          <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Channel Breakdown</h3>
+          <div class="chart-wrap"><canvas id="chart-channel-summary"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Delivered ──────────────────────────────────────────────── -->
+  <div class="view" id="view-delivered">
+    <div class="page-header">
+      <div>
+        <h2>Delivered Shipments</h2>
+        <div class="subtitle">Qty delivered — channel × date pivot</div>
+      </div>
+    </div>
+    <div class="content-area">
+
+      <!-- Filter bar with multi-selects -->
+      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <label>Channel</label>
+        <div class="ms-dropdown" id="ms-del-channel" data-all-label="All Channels">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-del-channel')">
+            <span class="ms-label">All Channels</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-del-channel',this)" checked> All</label>
+            <label class="ms-option"><input type="checkbox" value="Amazon" onchange="msItemToggle('ms-del-channel',this)"> Amazon</label>
+            <label class="ms-option"><input type="checkbox" value="TikTok" onchange="msItemToggle('ms-del-channel',this)"> TikTok</label>
+            <label class="ms-option"><input type="checkbox" value="Shipbob" onchange="msItemToggle('ms-del-channel',this)"> Shipbob</label>
+          </div>
+        </div>
+        <label>Del Week</label>
+        <div class="ms-dropdown" id="ms-del-week" data-all-label="All Weeks">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-del-week')">
+            <span class="ms-label">All Weeks</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel" id="ms-del-week-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-del-week',this)" checked> All</label>
+          </div>
+        </div>
+        <label>Delivery From</label>
+        <input type="date" id="del-from">
+        <label>To</label>
+        <input type="date" id="del-to">
+        <button class="btn btn-primary" onclick="loadDelivered()">Apply</button>
+        <button class="gf-clear-btn" onclick="clearDeliveredFilters()">✕ Clear</button>
+      </div>
+
+      <!-- Charts -->
+      <div class="chart-row" style="margin-bottom:24px;">
+        <div class="card">
+          <h3>Deliveries by Date</h3>
+          <div class="chart-wrap"><canvas id="chart-del-date"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Deliveries by Channel</h3>
+          <div class="chart-wrap"><canvas id="chart-del-channel"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Pivot table -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid #e2e8f0;">
+          <span style="font-size:12px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;">SUM of Qty Delivered — Channel × Date</span>
+          <span id="pivot-updated-label" style="font-size:11px;color:#718096;"></span>
+        </div>
+        <div id="pivot-wrap" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <!-- Shipment detail (collapsible) -->
+      <details>
+        <summary class="detail-toggle">▶ Shipment Detail Rows</summary>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>AWB</th><th>Channel</th><th>Transporter</th>
+                <th>Pickup Date</th><th>Delivery Date</th>
+                <th>Prom TAT</th><th>Actual TAT</th><th>Delay</th>
+                <th>Product</th><th>Qty</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="del-tbody"><tr><td colspan="11" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </details>
+
+    </div>
+  </div>
+
+  <!-- ── View: Undelivered ─────────────────────────────────────────────── -->
+  <div class="view" id="view-undelivered">
+    <div class="page-header">
+      <div>
+        <h2>Undelivered Shipments</h2>
+        <div class="subtitle">Rows in <span style="color:#e53e3e;font-weight:700;">red</span> are overdue (21+ days)</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="kpi-grid" id="undel-kpis" style="margin-bottom:20px;"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>AWB</th><th>Channel</th><th>Transporter</th>
+              <th>Pickup Date</th><th>Expected Delivery</th>
+              <th>Ageing (days)</th><th>Bucket</th><th>Delay Days</th>
+              <th>Status</th><th>Product</th><th>Qty</th>
+            </tr>
+          </thead>
+          <tbody id="undel-tbody"><tr><td colspan="11" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: TAT Analysis ───────────────────────────────────────────── -->
+  <div class="view" id="view-tat">
+    <div class="page-header">
+      <div>
+        <h2>TAT Analysis</h2>
+        <div class="subtitle">Transporter-wise — last 7 days</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="filter-bar">
+        <label>Period:</label>
+        <select id="tat-days" onchange="loadTAT()">
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+      </div>
+      <div class="chart-row" style="margin-bottom:24px;">
+        <div class="card">
+          <h3>Avg Actual TAT vs Promised TAT</h3>
+          <div class="chart-wrap"><canvas id="chart-tat-bar"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>On-Time % by Transporter</h3>
+          <div class="chart-wrap"><canvas id="chart-tat-ontime"></canvas></div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Transporter</th><th>Shipments</th>
+              <th>Avg Prom TAT</th><th>Avg Actual TAT</th>
+              <th>Avg Delay</th><th>On-Time %</th>
+            </tr>
+          </thead>
+          <tbody id="tat-tbody"><tr><td colspan="6" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Ageing ──────────────────────────────────────────────────── -->
+  <div class="view" id="view-ageing">
+    <div class="page-header">
+      <div>
+        <h2>Shipment Ageing</h2>
+        <div class="subtitle">Undelivered shipments by age bucket</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="chart-row">
+        <div class="card">
+          <h3>Ageing Buckets</h3>
+          <div class="chart-wrap"><canvas id="chart-ageing"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Distribution</h3>
+          <div class="chart-wrap"><canvas id="chart-ageing-pie"></canvas></div>
+        </div>
+      </div>
+      <div class="kpi-grid" id="ageing-kpis" style="margin-top:0;"></div>
+    </div>
+  </div>
+
+  <!-- ── View: Transporter Scorecard ──────────────────────────────────── -->
+  <div class="view" id="view-scorecard">
+    <div class="page-header">
+      <div>
+        <h2>Transporter Scorecard</h2>
+        <div class="subtitle">Ranked by on-time delivery percentage</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th><th>Transporter</th><th>Total</th>
+              <th>Delivered</th><th>Delivery Rate</th>
+              <th>Avg Prom TAT</th><th>Avg Actual TAT</th>
+              <th>Avg Delay</th><th>On-Time %</th>
+            </tr>
+          </thead>
+          <tbody id="scorecard-tbody"><tr><td colspan="9" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Channel Health ─────────────────────────────────────────── -->
+  <div class="view" id="view-channel-health">
+    <div class="page-header">
+      <div>
+        <h2>Channel Health Summary</h2>
+        <div class="subtitle">Green ≥80% delivered &lt;5% overdue · Orange mid · Red poor</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="channel-grid" id="channel-cards">
+        <div class="loading-state"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Trends ─────────────────────────────────────────────────── -->
+  <div class="view" id="view-trends">
+    <div class="page-header">
+      <div>
+        <h2>Weekly &amp; Monthly Trends</h2>
+        <div class="subtitle">Delivery trends over time</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="card" style="margin-bottom:16px;">
+        <h3>Weekly Deliveries</h3>
+        <div class="chart-wrap" style="height:260px;"><canvas id="chart-weekly"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Monthly Deliveries</h3>
+        <div class="chart-wrap" style="height:260px;"><canvas id="chart-monthly"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#main -->
+
+<script>
+// ── Chart registry (destroy before recreate) ─────────────────────────────
+const charts = {};
+function getChart(id, type, data, options) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, { type, data, options: options || {} });
+  return charts[id];
+}
+
+const PALETTE = ['#4f8ef7','#38a169','#dd6b20','#805ad5','#e53e3e','#d69e2e','#319795'];
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { font: { size: 12 } } } },
+};
+
+// ── Global filters ───────────────────────────────────────────────────────
+function getFilterParams() {
+  const p = new URLSearchParams();
+  const year  = document.getElementById('gf-year').value;
+  const month = document.getElementById('gf-month').value;
+  const week  = document.getElementById('gf-week').value;
+  const from  = document.getElementById('gf-date-from').value;
+  const to    = document.getElementById('gf-date-to').value;
+  if (year  && year  !== 'All') p.set('year',      year);
+  if (month && month !== 'All') p.set('month',     month);
+  if (week  && week  !== 'All') p.set('week',      week);
+  if (from) p.set('date_from', from);
+  if (to)   p.set('date_to',   to);
+  return p;
+}
+
+function isFiltered() {
+  const p = getFilterParams();
+  return p.toString() !== '';
+}
+
+function updateFilterBadge() {
+  document.getElementById('gf-active-badge').style.display = isFiltered() ? 'flex' : 'none';
+}
+
+function clearFilters() {
+  document.getElementById('gf-year').value = 'All';
+  document.getElementById('gf-month').value = 'All';
+  document.getElementById('gf-week').value = 'All';
+  document.getElementById('gf-date-from').value = '';
+  document.getElementById('gf-date-to').value = '';
+  updateFilterBadge();
+  reloadCurrentView();
+}
+
+function apiFetch(path, extraParams) {
+  const p = getFilterParams();
+  if (extraParams) extraParams.forEach((v, k) => p.set(k, v));
+  const sep = path.includes('?') ? '&' : '?';
+  return fetch(path + (p.toString() ? sep + p.toString() : ''));
+}
+
+async function loadFilterOptions() {
+  const res = await fetch('/api/filter-options');
+  const opts = await res.json();
+
+  const yearSel = document.getElementById('gf-year');
+  opts.years.forEach(y => { const o = document.createElement('option'); o.value = o.textContent = y; yearSel.appendChild(o); });
+
+  const monthSel = document.getElementById('gf-month');
+  opts.months.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; monthSel.appendChild(o); });
+
+  const weekSel = document.getElementById('gf-week');
+  opts.weeks.forEach(w => { const o = document.createElement('option'); o.value = o.textContent = 'W' + w; o.value = w; weekSel.appendChild(o); });
+
+  // Populate del-week multi-select
+  const panel = document.getElementById('ms-del-week-panel');
+  opts.del_weeks.forEach(w => {
+    panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-del-week',this)"> W${w}</label>`;
+  });
+}
+
+// ── Multi-select helpers ─────────────────────────────────────────────────────
+function toggleMs(id) {
+  const panel = document.getElementById(id).querySelector('.ms-panel');
+  const isOpen = panel.classList.contains('open');
+  document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
+  if (!isOpen) panel.classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ms-dropdown'))
+    document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
+});
+
+function getMsValues(id) {
+  const el = document.getElementById(id);
+  const allCb = el.querySelector('input[value="__all__"]');
+  if (allCb && allCb.checked) return [];
+  return Array.from(el.querySelectorAll('input[type="checkbox"]:checked'))
+    .map(cb => cb.value).filter(v => v !== '__all__');
+}
+
+function updateMsLabel(id) {
+  const el = document.getElementById(id);
+  const values = getMsValues(id);
+  const label = el.querySelector('.ms-label');
+  const allCb = el.querySelector('input[value="__all__"]');
+  if (values.length === 0) {
+    label.textContent = el.dataset.allLabel || 'All';
+    if (allCb) allCb.checked = true;
+  } else {
+    label.textContent = values.length <= 2 ? values.join(', ') : `${values.length} selected`;
+    if (allCb) allCb.checked = false;
+  }
+}
+
+function msAllToggle(id, allCb) {
+  const el = document.getElementById(id);
+  if (allCb.checked)
+    el.querySelectorAll('input[type="checkbox"]:not([value="__all__"])').forEach(cb => cb.checked = false);
+  updateMsLabel(id);
+}
+
+function msItemToggle(id, itemCb) {
+  const el = document.getElementById(id);
+  const allCb = el.querySelector('input[value="__all__"]');
+  const anyChecked = Array.from(el.querySelectorAll('input[type="checkbox"]:not([value="__all__"])')).some(cb => cb.checked);
+  if (!anyChecked && allCb) allCb.checked = true;
+  updateMsLabel(id);
+}
+
+// Re-fire current view when any filter changes
+['gf-year','gf-month','gf-week'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => { updateFilterBadge(); reloadCurrentView(); });
+});
+['gf-date-from','gf-date-to'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => { updateFilterBadge(); reloadCurrentView(); });
+});
+
+// ── Navigation ───────────────────────────────────────────────────────────
+const navItems = document.querySelectorAll('.nav-item');
+const views = document.querySelectorAll('.view');
+
+navItems.forEach(item => {
+  item.addEventListener('click', () => {
+    navItems.forEach(n => n.classList.remove('active'));
+    views.forEach(v => v.classList.remove('active'));
+    item.classList.add('active');
+    const viewId = 'view-' + item.dataset.view;
+    document.getElementById(viewId).classList.add('active');
+    loadView(item.dataset.view, true);
+  });
+});
+
+// ── Load dispatcher ──────────────────────────────────────────────────────
+function reloadCurrentView() {
+  const active = document.querySelector('.nav-item.active');
+  if (active) loadView(active.dataset.view, true);
+}
+
+function loadView(view, force) {
+  switch (view) {
+    case 'daily-summary':  loadSummary(); break;
+    case 'delivered':      loadDelivered(); break;
+    case 'undelivered':    loadUndelivered(); break;
+    case 'tat':            loadTAT(); break;
+    case 'ageing':         loadAgeing(); break;
+    case 'scorecard':      loadScorecard(); break;
+    case 'channel-health': loadChannelHealth(); break;
+    case 'trends':         loadTrends(); break;
+  }
+}
+
+function refreshData() {
+  document.getElementById('refresh-btn').disabled = true;
+  reloadCurrentView();
+  document.getElementById('refresh-btn').disabled = false;
+  document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+function fmtNum(n) { return n == null || n === '' ? '—' : Number(n).toLocaleString(); }
+function fmtFloat(n, dec=1) { return n == null || n === '' || isNaN(n) ? '—' : Number(n).toFixed(dec); }
+function delayBadge(d) {
+  if (d == null || d === '' || isNaN(d)) return '<span class="badge badge-gray">—</span>';
+  d = Number(d);
+  if (d <= 0) return `<span class="badge badge-green">On Time</span>`;
+  if (d <= 3) return `<span class="badge badge-orange">+${d}d</span>`;
+  return `<span class="badge badge-red">+${d}d</span>`;
+}
+function statusBadge(s) {
+  const cls = s === 'Delivered' ? 'badge-green'
+    : (s === 'RTO' || s === 'Abandon') ? 'badge-red'
+    : 'badge-blue';
+  return `<span class="badge ${cls}">${s || '—'}</span>`;
+}
+function bucketBadge(b) {
+  const cls = (b === '21-30' || b === '30+') ? 'badge-red'
+    : b === '11-20' ? 'badge-orange' : 'badge-blue';
+  return `<span class="badge ${cls}">${b || '—'}</span>`;
+}
+
+// ── View 1: Daily Summary ────────────────────────────────────────────────
+async function loadSummary() {
+  const res = await apiFetch('/api/daily-summary');
+  const s = await res.json();
+
+  document.getElementById('summary-date').textContent =
+    'As of ' + new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  document.getElementById('summary-kpis').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Total Shipments</div>
+      <div class="kpi-value">${fmtNum(s.total_shipments)}</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">Delivered</div>
+      <div class="kpi-value">${fmtNum(s.delivered)}</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">In Transit / Undelivered</div>
+      <div class="kpi-value">${fmtNum(s.undelivered)}</div>
+    </div>
+    <div class="kpi-card accent-red">
+      <div class="kpi-label">Overdue (21+ days)</div>
+      <div class="kpi-value">${fmtNum(s.overdue)}</div>
+    </div>
+    <div class="kpi-card accent-orange">
+      <div class="kpi-label">Today's Pickups</div>
+      <div class="kpi-value">${fmtNum(s.today_pickups)}</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">This Week Delivered</div>
+      <div class="kpi-value">${fmtNum(s.week_delivered)}</div>
+    </div>
+  `;
+
+  // Status doughnut
+  const statuses = s.status_breakdown;
+  getChart('chart-status', 'doughnut', {
+    labels: Object.keys(statuses),
+    datasets: [{ data: Object.values(statuses), backgroundColor: PALETTE, borderWidth: 2 }]
+  }, { ...CHART_DEFAULTS, plugins: { ...CHART_DEFAULTS.plugins, legend: { position: 'right', labels: { font: { size: 12 } } } } });
+
+  // Channel bar
+  const ch = s.channel_breakdown;
+  getChart('chart-channel-summary', 'bar', {
+    labels: ch.map(r => r.Channel),
+    datasets: [
+      { label: 'Delivered', data: ch.map(r => r.delivered), backgroundColor: '#38a169' },
+      { label: 'Undelivered', data: ch.map(r => r.total - r.delivered), backgroundColor: '#4f8ef7' },
+    ]
+  }, { ...CHART_DEFAULTS, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } });
+}
+
+// ── View 2: Delivered ────────────────────────────────────────────────────
+async function loadDelivered() {
+  const channels = getMsValues('ms-del-channel');
+  const delWeeks = getMsValues('ms-del-week');
+  const from = document.getElementById('del-from').value;
+  const to   = document.getElementById('del-to').value;
+
+  const extra = new URLSearchParams();
+  if (channels.length) extra.set('channel', channels.join(','));
+  if (delWeeks.length) extra.set('del_week', delWeeks.join(','));
+  if (from) extra.set('from', from);
+  if (to)   extra.set('to', to);
+
+  const pivotExtra = new URLSearchParams();
+  if (channels.length) pivotExtra.set('channels', channels.join(','));
+  if (delWeeks.length) pivotExtra.set('del_weeks', delWeeks.join(','));
+  if (from) pivotExtra.set('from', from);
+  if (to)   pivotExtra.set('to', to);
+
+  // Fire charts+table and pivot in parallel
+  const [res, pivotRes] = await Promise.all([
+    apiFetch('/api/delivered', extra),
+    apiFetch('/api/delivered-pivot', pivotExtra),
+  ]);
+  const data      = await res.json();
+  const pivotData = await pivotRes.json();
+
+  // Charts
+  const ch = data.charts;
+  getChart('chart-del-date', 'bar', {
+    labels: ch.by_date.map(r => r.delivery_date),
+    datasets: [{ label: 'Deliveries', data: ch.by_date.map(r => r.count), backgroundColor: '#4f8ef7', borderRadius: 4 }]
+  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
+
+  getChart('chart-del-channel', 'doughnut', {
+    labels: ch.by_channel.map(r => r.Channel),
+    datasets: [{ data: ch.by_channel.map(r => r.count), backgroundColor: PALETTE, borderWidth: 2 }]
+  }, { ...CHART_DEFAULTS });
+
+  // Pivot
+  renderPivot(pivotData);
+
+  // Detail table
+  const rows = data.rows;
+  const tbody = document.getElementById('del-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No records found</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td>${r['Shipment AWB'] || '—'}</td>
+      <td>${r['Channel'] || '—'}</td>
+      <td>${r['Transporter'] || '—'}</td>
+      <td>${r['Pick up Date'] || '—'}</td>
+      <td>${r['Actual Delivery Date'] || '—'}</td>
+      <td>${fmtFloat(r['Prom TAT'])}</td>
+      <td>${fmtFloat(r['Actual TAT'])}</td>
+      <td>${delayBadge(r['Delay Days'])}</td>
+      <td>${r['Product Name'] || '—'}</td>
+      <td>${fmtNum(r['Qty Sent'])}</td>
+      <td>${statusBadge(r['Current Status - Ship partner portal'])}</td>
+    </tr>`).join('');
+  }
+}
+
+function clearDeliveredFilters() {
+  // Reset channel multi-select to All
+  ['ms-del-channel', 'ms-del-week'].forEach(id => {
+    const el = document.getElementById(id);
+    el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    const allCb = el.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel(id);
+  });
+  document.getElementById('del-from').value = '';
+  document.getElementById('del-to').value = '';
+  loadDelivered();
+}
+
+function renderPivot(data) {
+  const wrap = document.getElementById('pivot-wrap');
+  const { dates, rows, grand_totals, overall_total } = data;
+
+  if (!dates.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:#718096;font-size:13px;">No delivery data for the selected filters / date range</div>';
+    return;
+  }
+
+  document.getElementById('pivot-updated-label').textContent =
+    'Updated: ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+
+  let html = '<table class="pivot-table"><thead><tr>';
+  html += '<th>Channel / Product</th>';
+  dates.forEach(d => { html += `<th>${d}</th>`; });
+  html += '<th class="pivot-col-total">Total</th></tr></thead><tbody>';
+
+  rows.forEach(chRow => {
+    const chId = chRow.channel.replace(/[^a-zA-Z0-9]/g, '_');
+
+    // Channel header row
+    html += `<tr class="pivot-ch-row" data-chid="${chId}">`;
+    html += `<td><button class="pivot-toggle" onclick="togglePivotCh('${chId}')">−</button><strong>${chRow.channel}</strong></td>`;
+    dates.forEach(d => {
+      const v = chRow.subtotals[d];
+      html += `<td>${v != null ? v.toLocaleString() : ''}</td>`;
+    });
+    html += `<td class="pivot-col-total"><strong>${chRow.channel_total.toLocaleString()}</strong></td></tr>`;
+
+    // Product rows
+    chRow.products.forEach(prod => {
+      html += `<tr class="pivot-prod-row" data-chid="${chId}">`;
+      html += `<td>${prod.product}</td>`;
+      dates.forEach(d => {
+        const v = prod.values[d];
+        html += `<td>${v != null ? v.toLocaleString() : ''}</td>`;
+      });
+      html += `<td class="pivot-col-total">${prod.total.toLocaleString()}</td></tr>`;
+    });
+  });
+
+  // Grand total
+  html += '<tr class="pivot-total-row"><td><strong>Grand Total</strong></td>';
+  dates.forEach(d => {
+    const v = grand_totals[d];
+    html += `<td><strong>${v != null ? v.toLocaleString() : ''}</strong></td>`;
+  });
+  html += `<td class="pivot-col-total"><strong>${overall_total.toLocaleString()}</strong></td></tr>`;
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function togglePivotCh(chId) {
+  const prodRows = document.querySelectorAll(`.pivot-prod-row[data-chid="${chId}"]`);
+  const btn = document.querySelector(`.pivot-ch-row[data-chid="${chId}"] .pivot-toggle`);
+  const collapsed = btn.textContent.trim() === '+';
+  prodRows.forEach(r => { r.style.display = collapsed ? '' : 'none'; });
+  btn.textContent = collapsed ? '−' : '+';
+}
+
+// ── View 3: Undelivered ──────────────────────────────────────────────────
+async function loadUndelivered() {
+  const res = await apiFetch('/api/undelivered');
+  const rows = await res.json();
+
+  const overdue = rows.filter(r => r.is_overdue).length;
+  const byChannel = {};
+  rows.forEach(r => { byChannel[r.Channel] = (byChannel[r.Channel] || 0) + 1; });
+
+  document.getElementById('undel-kpis').innerHTML = `
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Total Undelivered</div>
+      <div class="kpi-value">${fmtNum(rows.length)}</div>
+    </div>
+    <div class="kpi-card accent-red">
+      <div class="kpi-label">Overdue (21+ days)</div>
+      <div class="kpi-value">${fmtNum(overdue)}</div>
+    </div>
+    ${Object.entries(byChannel).map(([ch, cnt]) => `
+    <div class="kpi-card">
+      <div class="kpi-label">${ch}</div>
+      <div class="kpi-value">${fmtNum(cnt)}</div>
+    </div>`).join('')}
+  `;
+
+  const tbody = document.getElementById('undel-tbody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No undelivered shipments</td></tr>'; return; }
+
+  // Sort: overdue first
+  rows.sort((a, b) => (b.is_overdue ? 1 : 0) - (a.is_overdue ? 1 : 0) || (b.Ageing || 0) - (a.Ageing || 0));
+
+  const statusKey = 'Current Status - Ship partner portal';
+  tbody.innerHTML = rows.map(r => `<tr class="${r.is_overdue ? 'overdue' : ''}">
+    <td>${r['Shipment AWB'] || '—'}</td>
+    <td>${r['Channel'] || '—'}</td>
+    <td>${r['Transporter'] || '—'}</td>
+    <td>${r['Pick up Date'] || '—'}</td>
+    <td>${r['Expected Delivery Date'] || '—'}</td>
+    <td><strong>${r['Ageing'] !== '' ? r['Ageing'] : '—'}</strong></td>
+    <td>${bucketBadge(r['Ageing Bucket'])}</td>
+    <td>${delayBadge(r['Delay Days'])}</td>
+    <td>${statusBadge(r[statusKey])}</td>
+    <td>${r['Product Name'] || '—'}</td>
+    <td>${fmtNum(r['Qty Sent'])}</td>
+  </tr>`).join('');
+}
+
+// ── View 4: TAT Analysis ─────────────────────────────────────────────────
+async function loadTAT() {
+  const days = document.getElementById('tat-days').value;
+  const res = await apiFetch('/api/tat', new URLSearchParams({ days }));
+  const rows = await res.json();
+
+  const labels = rows.map(r => r.Transporter);
+
+  getChart('chart-tat-bar', 'bar', {
+    labels,
+    datasets: [
+      { label: 'Avg Prom TAT', data: rows.map(r => r.avg_prom_tat), backgroundColor: '#4f8ef7', borderRadius: 4 },
+      { label: 'Avg Actual TAT', data: rows.map(r => r.avg_actual_tat), backgroundColor: '#dd6b20', borderRadius: 4 },
+    ]
+  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
+
+  getChart('chart-tat-ontime', 'bar', {
+    labels,
+    datasets: [{ label: 'On-Time %', data: rows.map(r => r.on_time_pct), backgroundColor: rows.map(r => r.on_time_pct >= 80 ? '#38a169' : r.on_time_pct >= 60 ? '#dd6b20' : '#e53e3e'), borderRadius: 4 }]
+  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true, max: 100 } } });
+
+  const tbody = document.getElementById('tat-tbody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#718096;">No TAT data for this period</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td><strong>${r.Transporter}</strong></td>
+    <td>${fmtNum(r.shipments)}</td>
+    <td>${fmtFloat(r.avg_prom_tat)}</td>
+    <td>${fmtFloat(r.avg_actual_tat)}</td>
+    <td>${delayBadge(r.avg_delay)}</td>
+    <td><span class="badge ${r.on_time_pct >= 80 ? 'badge-green' : r.on_time_pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.on_time_pct)}%</span></td>
+  </tr>`).join('');
+}
+
+// ── View 5: Ageing ───────────────────────────────────────────────────────
+async function loadAgeing() {
+  const res = await apiFetch('/api/ageing');
+  const rows = await res.json();
+
+  const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
+  const labels = rows.map(r => r.bucket);
+  const counts = rows.map(r => r.count);
+  const colors = rows.map(r => BUCKET_COLORS[r.bucket] || '#718096');
+
+  getChart('chart-ageing', 'bar', {
+    labels,
+    datasets: [{ label: 'Shipments', data: counts, backgroundColor: colors, borderRadius: 6 }]
+  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
+
+  getChart('chart-ageing-pie', 'doughnut', {
+    labels,
+    datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2 }]
+  }, { ...CHART_DEFAULTS });
+
+  document.getElementById('ageing-kpis').innerHTML = rows.map(r => `
+    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
+      <div class="kpi-label">${r.bucket} days</div>
+      <div class="kpi-value">${fmtNum(r.count)}</div>
+    </div>
+  `).join('');
+}
+
+// ── View 6: Scorecard ────────────────────────────────────────────────────
+async function loadScorecard() {
+  const res = await apiFetch('/api/scorecard');
+  const rows = await res.json();
+
+  const tbody = document.getElementById('scorecard-tbody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#718096;">No data</td></tr>'; return; }
+  tbody.innerHTML = rows.map((r, i) => `<tr>
+    <td><span class="rank-badge" style="background:${i===0?'#d69e2e':i===1?'#718096':i===2?'#c05621':'#4f8ef7'}">${i+1}</span></td>
+    <td><strong>${r.Transporter}</strong></td>
+    <td>${fmtNum(r.total)}</td>
+    <td>${fmtNum(r.delivered)}</td>
+    <td><span class="badge ${r.delivery_rate >= 80 ? 'badge-green' : r.delivery_rate >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.delivery_rate)}%</span></td>
+    <td>${fmtFloat(r.avg_prom_tat)}</td>
+    <td>${fmtFloat(r.avg_actual_tat)}</td>
+    <td>${delayBadge(r.avg_delay)}</td>
+    <td><span class="badge ${r.on_time_pct >= 80 ? 'badge-green' : r.on_time_pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.on_time_pct)}%</span></td>
+  </tr>`).join('');
+}
+
+// ── View 7: Channel Health ───────────────────────────────────────────────
+async function loadChannelHealth() {
+  const res = await apiFetch('/api/channel-health');
+  const channels = await res.json();
+
+  document.getElementById('channel-cards').innerHTML = channels.map(c => `
+    <div class="channel-card health-${c.health}">
+      <h3><span class="health-indicator"></span>${c.channel}</h3>
+      <div class="channel-stat-row"><span class="label">Total Shipments</span><span class="value">${fmtNum(c.total)}</span></div>
+      <div class="channel-stat-row"><span class="label">Delivered</span><span class="value" style="color:#38a169">${fmtNum(c.delivered)}</span></div>
+      <div class="channel-stat-row"><span class="label">Undelivered</span><span class="value">${fmtNum(c.undelivered)}</span></div>
+      <div class="channel-stat-row"><span class="label">Overdue (21+ days)</span><span class="value" style="color:#e53e3e">${fmtNum(c.overdue)}</span></div>
+      <div class="channel-stat-row"><span class="label">Delivery Rate</span>
+        <span class="value"><span class="badge ${c.delivery_rate >= 80 ? 'badge-green' : c.delivery_rate >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(c.delivery_rate)}%</span></span>
+      </div>
+      <div class="channel-stat-row"><span class="label">Avg Actual TAT</span><span class="value">${fmtFloat(c.avg_actual_tat)} days</span></div>
+      <div class="channel-stat-row"><span class="label">Avg Delay</span><span class="value">${fmtFloat(c.avg_delay)} days</span></div>
+      <div style="margin-top:12px;font-size:11px;color:#718096;">
+        ${Object.entries(c.status_breakdown).map(([s,n]) => `<span style="margin-right:10px;">${s}: <strong>${n}</strong></span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── View 8: Trends ───────────────────────────────────────────────────────
+async function loadTrends() {
+  const res = await apiFetch('/api/trends');
+  const data = await res.json();
+
+  getChart('chart-weekly', 'line', {
+    labels: data.weekly.map(r => r.week_label),
+    datasets: [{ label: 'Deliveries', data: data.weekly.map(r => r.deliveries), borderColor: '#4f8ef7', backgroundColor: 'rgba(79,142,247,0.1)', fill: true, tension: 0.3, pointRadius: 4 }]
+  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
+
+  getChart('chart-monthly', 'bar', {
+    labels: data.monthly.map(r => r.month_label),
+    datasets: [{ label: 'Deliveries', data: data.monthly.map(r => r.deliveries), backgroundColor: '#38a169', borderRadius: 6 }]
+  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────
+loadFilterOptions().then(() => loadView('daily-summary'));
+document.getElementById('last-updated').textContent = 'Loaded ' + new Date().toLocaleTimeString();
+</script>
+
+</body>
+</html>
