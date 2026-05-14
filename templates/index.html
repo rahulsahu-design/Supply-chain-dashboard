@@ -589,10 +589,14 @@ function loadView(view, force) {
   }
 }
 
-function refreshData() {
-  document.getElementById('refresh-btn').disabled = true;
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ Fetching…';
+  await fetch('/api/daily-summary?refresh=1'); // force server to re-fetch from Google Sheets
   reloadCurrentView();
-  document.getElementById('refresh-btn').disabled = false;
+  btn.textContent = '↻ Refresh Data';
+  btn.disabled = false;
   document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
 }
 
