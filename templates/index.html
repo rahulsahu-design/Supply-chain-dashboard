@@ -886,8 +886,7 @@ async function loadUndelivered() {
   rows.sort((a, b) => (b['Ageing'] || 0) - (a['Ageing'] || 0));
 
   const statusKey = 'Current Status - Ship partner portal';
-  const isOverdue = r => r['Ageing Bucket'] === '21-30' || r['Ageing Bucket'] === '30+';
-  tbody.innerHTML = rows.map(r => `<tr class="${isOverdue(r) ? 'overdue' : ''}">
+  tbody.innerHTML = rows.map(r => `<tr class="${r.is_overdue ? 'overdue' : ''}">
     <td>${r['Shipment AWB'] || '—'}</td>
     <td>${r['Channel'] || '—'}</td>
     <td>${r['Transporter'] || '—'}</td>

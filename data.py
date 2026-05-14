@@ -19,6 +19,9 @@ STATUS_COL = "Current Status - Ship partner portal"
 DELIVERED_STATUSES = {"Delivered"}
 OVERDUE_BUCKETS = {"21-30", "30+"}
 EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "Abandon"}
+XINDUS = "Xindus Air + Sea"
+PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
+PROM_TAT_DEFAULT = 12
 
 _cache = {"df": None, "fetched_at": None}
 CACHE_TTL_SECONDS = 300
@@ -82,9 +85,30 @@ def fetch_data(force=False) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
+    # Fill missing Prom TAT with transporter-specific defaults
+    if "Prom TAT" in df.columns and "Transporter" in df.columns:
+        prom_null = df["Prom TAT"].isna()
+        if prom_null.any():
+            for t, tat in PROM_TAT_BY_TRANSPORTER.items():
+                df.loc[prom_null & (df["Transporter"].str.strip() == t), "Prom TAT"] = tat
+            df.loc[prom_null & df["Prom TAT"].isna(), "Prom TAT"] = PROM_TAT_DEFAULT
+            # Recalculate Delay Days for rows where Prom TAT was previously missing
+            if "Actual TAT" in df.columns and "Delay Days" in df.columns:
+                recalc = prom_null & df["Actual TAT"].notna()
+                df.loc[recalc, "Delay Days"] = df.loc[recalc, "Actual TAT"] - df.loc[recalc, "Prom TAT"]
+
     # Derived flags
     df["is_delivered"] = df[STATUS_COL].str.strip().isin(DELIVERED_STATUSES)
-    df["is_overdue"] = df["Ageing Bucket"].str.strip().isin(OVERDUE_BUCKETS)
+
+    # is_overdue: Xindus = ageing > 40 days, all others = ageing bucket 21+
+    if "Transporter" in df.columns and "Ageing" in df.columns:
+        xindus = df["Transporter"].str.strip() == XINDUS
+        df["is_overdue"] = (
+            (xindus & (df["Ageing"].fillna(0) > 40)) |
+            (~xindus & df["Ageing Bucket"].str.strip().isin(OVERDUE_BUCKETS))
+        )
+    else:
+        df["is_overdue"] = df["Ageing Bucket"].str.strip().isin(OVERDUE_BUCKETS)
 
     _cache["df"] = df
     _cache["fetched_at"] = now
@@ -360,13 +384,15 @@ def undelivered_shipments(df: pd.DataFrame, channel=None, exp_del_week=None,
     cols = [
         "Shipment AWB", "Channel", "Transporter", "Pick up Date",
         "Expected Delivery Date", "Ageing", "Ageing Bucket",
-        "Delay Days", STATUS_COL, "Product Name", "Qty Sent",
+        "Delay Days", STATUS_COL, "Product Name", "Qty Sent", "is_overdue",
     ]
     cols = [c for c in cols if c in d.columns]
     out = d[cols].copy()
     for dc in ["Pick up Date", "Expected Delivery Date"]:
         if dc in out.columns:
             out[dc] = out[dc].dt.strftime("%d/%m/%Y").fillna("")
+    if "is_overdue" in out.columns:
+        out["is_overdue"] = out["is_overdue"].astype(bool)
     return out.fillna("").to_dict(orient="records")
 
 
