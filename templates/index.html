@@ -944,7 +944,7 @@ async function loadTAT() {
     <td>${fmtFloat(r.avg_prom_tat)}</td>
     <td>${fmtFloat(r.avg_actual_tat)}</td>
     <td>${delayBadge(r.avg_delay)}</td>
-    <td><span class="badge ${r.on_time_pct >= 80 ? 'badge-green' : r.on_time_pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.on_time_pct)}%</span></td>
+    <td><span class="badge ${r.on_time_pct === '' ? 'badge-gray' : r.on_time_pct >= 80 ? 'badge-green' : r.on_time_pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.on_time_pct)}%</span></td>
   </tr>`).join('');
 }
 
@@ -992,7 +992,7 @@ async function loadScorecard() {
     <td>${fmtFloat(r.avg_prom_tat)}</td>
     <td>${fmtFloat(r.avg_actual_tat)}</td>
     <td>${delayBadge(r.avg_delay)}</td>
-    <td><span class="badge ${r.on_time_pct >= 80 ? 'badge-green' : r.on_time_pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.on_time_pct)}%</span></td>
+    <td><span class="badge ${r.on_time_pct === '' ? 'badge-gray' : r.on_time_pct >= 80 ? 'badge-green' : r.on_time_pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.on_time_pct)}%</span></td>
   </tr>`).join('');
 }
 

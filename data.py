@@ -491,20 +491,23 @@ def shipment_ageing(df: pd.DataFrame) -> list:
 
 
 def transporter_scorecard(df: pd.DataFrame) -> list:
-    d = df[df["Actual TAT"].notna() & df["Prom TAT"].notna()].copy()
-    grouped = d.groupby("Transporter").agg(
+    grouped = df.groupby("Transporter").agg(
         total=("Shipment AWB", "count"),
         delivered=("is_delivered", "sum"),
         avg_actual_tat=("Actual TAT", "mean"),
         avg_prom_tat=("Prom TAT", "mean"),
         avg_delay=("Delay Days", "mean"),
-        on_time=("Delay Days", lambda x: (x <= 0).sum()),
+        on_time=("Delay Days", lambda x: (x.dropna() <= 0).sum()),
+        tat_count=("Actual TAT", "count"),
     ).reset_index()
 
-    grouped["on_time_pct"] = (grouped["on_time"] / grouped["total"] * 100).round(1)
+    # on_time_pct based only on shipments that have TAT data
+    grouped["on_time_pct"] = (
+        grouped["on_time"] / grouped["tat_count"].replace(0, pd.NA) * 100
+    ).round(1)
     grouped["delivery_rate"] = (grouped["delivered"] / grouped["total"] * 100).round(1)
-    grouped = grouped.round(2).sort_values("on_time_pct", ascending=False)
-    return grouped.to_dict(orient="records")
+    grouped = grouped.round(2).sort_values("delivery_rate", ascending=False)
+    return grouped.fillna("").to_dict(orient="records")
 
 
 def channel_health(df: pd.DataFrame) -> list:
