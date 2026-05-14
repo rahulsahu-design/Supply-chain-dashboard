@@ -503,7 +503,7 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
 
     # on_time_pct based only on shipments that have TAT data
     grouped["on_time_pct"] = (
-        grouped["on_time"] / grouped["tat_count"].replace(0, pd.NA) * 100
+        grouped["on_time"] / grouped["tat_count"].replace(0, float('nan')) * 100
     ).round(1)
     grouped["delivery_rate"] = (grouped["delivered"] / grouped["total"] * 100).round(1)
     grouped = grouped.round(2).sort_values("delivery_rate", ascending=False)
