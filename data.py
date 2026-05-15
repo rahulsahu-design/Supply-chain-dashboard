@@ -491,6 +491,7 @@ def shipment_ageing(df: pd.DataFrame) -> list:
 
 
 def transporter_scorecard(df: pd.DataFrame) -> list:
+    df = df[df["Transporter"].notna() & (df["Transporter"].str.strip() != "")].copy()
     grouped = df.groupby("Transporter").agg(
         total=("Shipment AWB", "count"),
         delivered=("is_delivered", "sum"),
