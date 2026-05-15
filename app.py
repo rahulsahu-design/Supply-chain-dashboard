@@ -91,6 +91,11 @@ def api_undelivered_pivot():
                                        date_from=date_from, date_to=date_to, year=year))
 
 
+@app.route("/api/raw-data")
+def api_raw_data():
+    return jsonify(d.raw_data_2026(d.fetch_data()))
+
+
 @app.route("/api/tat")
 def api_tat():
     days = int(request.args.get("days", 7))

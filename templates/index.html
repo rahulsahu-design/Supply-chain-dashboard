@@ -51,6 +51,11 @@
     <span class="nav-icon">📈</span> Trends
   </div>
 
+  <div class="sidebar-section-label">Data</div>
+  <div class="nav-item" data-view="raw-data">
+    <span class="nav-icon">🗃️</span> Raw Data 2026
+  </div>
+
   <div class="sidebar-footer">
     <button id="refresh-btn" onclick="refreshData()">↻ Refresh Data</button>
     <div class="last-updated" id="last-updated">Not yet loaded</div>
@@ -190,15 +195,8 @@
       <details>
         <summary class="detail-toggle">▶ Shipment Detail Rows</summary>
         <div class="table-wrap" style="margin-top:12px;">
-          <table>
-            <thead>
-              <tr>
-                <th>AWB</th><th>Channel</th><th>Transporter</th>
-                <th>Pickup Date</th><th>Delivery Date</th>
-                <th>Prom TAT</th><th>Actual TAT</th><th>Delay</th>
-                <th>Product</th><th>Qty</th><th>Status</th>
-              </tr>
-            </thead>
+          <table id="del-table">
+            <thead id="del-thead"></thead>
             <tbody id="del-tbody"><tr><td colspan="11" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
           </table>
         </div>
@@ -271,15 +269,8 @@
       <details>
         <summary class="detail-toggle">▶ Shipment Detail Rows</summary>
         <div class="table-wrap" style="margin-top:12px;">
-          <table>
-            <thead>
-              <tr>
-                <th>AWB</th><th>Channel</th><th>Transporter</th>
-                <th>Pickup Date</th><th>Expected Delivery</th>
-                <th>Ageing (days)</th><th>Bucket</th><th>Delay Days</th>
-                <th>Status</th><th>Product</th><th>Qty</th>
-              </tr>
-            </thead>
+          <table id="undel-table">
+            <thead id="undel-thead"></thead>
             <tbody id="undel-tbody"><tr><td colspan="11" class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
           </table>
         </div>
@@ -435,6 +426,32 @@
       <div class="card">
         <h3>Monthly Deliveries</h3>
         <div class="chart-wrap" style="height:260px;"><canvas id="chart-monthly"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Raw Data 2026 ──────────────────────────────────────────── -->
+  <div class="view" id="view-raw-data">
+    <div class="page-header">
+      <div>
+        <h2>Raw Shipment Data — 2026</h2>
+        <div class="subtitle" id="raw-data-subtitle">All shipments for the year 2026 from the tracker sheet</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="filter-bar" style="margin-bottom:16px;gap:10px;">
+        <label>Search</label>
+        <input type="text" id="raw-search" placeholder="Filter any column…" oninput="filterRawTable()" style="min-width:240px;">
+        <button class="gf-clear-btn" onclick="document.getElementById('raw-search').value='';filterRawTable()">✕ Clear</button>
+        <span id="raw-count" style="margin-left:auto;font-size:12px;color:var(--text-400);"></span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="table-wrap" style="overflow-x:auto;max-height:72vh;">
+          <table id="raw-table">
+            <thead id="raw-thead"></thead>
+            <tbody id="raw-tbody"><tr><td class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -635,6 +652,7 @@ function loadView(view, force) {
     case 'scorecard':      return loadScorecard();
     case 'channel-health': return loadChannelHealth();
     case 'trends':         return loadTrends();
+    case 'raw-data':       return loadRawData();
   }
 }
 
@@ -741,7 +759,72 @@ function applyPeriod(selectEl, fromId, toId, loadFn) {
   loadFn();
 }
 
+// ── Sortable table utilities ──────────────────────────────────────────────
+function parseDate(s) {
+  if (!s) return 0;
+  const p = s.split('/');
+  return p.length === 3 ? new Date(+p[2], +p[1]-1, +p[0]).getTime() : (new Date(s).getTime() || 0);
+}
+function sortRows(rows, col, dir) {
+  return [...rows].sort((a, b) => {
+    let va = a[col.key] ?? '', vb = b[col.key] ?? '';
+    if (col.type === 'num')  { va = parseFloat(va)||0; vb = parseFloat(vb)||0; }
+    else if (col.type === 'date') { va = parseDate(String(va)); vb = parseDate(String(vb)); }
+    else { va = String(va).toLowerCase(); vb = String(vb).toLowerCase(); }
+    return va < vb ? -dir : va > vb ? dir : 0;
+  });
+}
+function buildThead(theadId, cols, sortState, clickFn) {
+  document.getElementById(theadId).innerHTML = '<tr>' + cols.map((col, i) => {
+    const active = sortState.col === i;
+    const arrow  = active ? (sortState.dir === 1 ? '▲' : '▼') : '⇅';
+    return `<th onclick="${clickFn}(${i})" style="cursor:pointer;white-space:nowrap;user-select:none;" title="Sort by ${col.label}">${col.label} <span style="font-size:9px;opacity:${active?1:0.3};vertical-align:middle;">${arrow}</span></th>`;
+  }).join('') + '</tr>';
+}
+
 // ── View 2: Delivered ────────────────────────────────────────────────────
+const DEL_COLS = [
+  { label:'AWB',           key:'Shipment AWB',                         type:'str'  },
+  { label:'Channel',       key:'Channel',                              type:'str'  },
+  { label:'Transporter',   key:'Transporter',                          type:'str'  },
+  { label:'Pickup Date',   key:'Pick up Date',                         type:'date' },
+  { label:'Delivery Date', key:'Actual Delivery Date',                 type:'date' },
+  { label:'Prom TAT',      key:'Prom TAT',                             type:'num'  },
+  { label:'Actual TAT',    key:'Actual TAT',                           type:'num'  },
+  { label:'Delay',         key:'Delay Days',                           type:'num'  },
+  { label:'Product',       key:'Product Name',                         type:'str'  },
+  { label:'Qty',           key:'Qty Sent',                             type:'num'  },
+  { label:'Status',        key:'Current Status - Ship partner portal', type:'str'  },
+];
+let _delRows = [], _delSort = { col: -1, dir: 1 };
+function clickDelSort(i) {
+  _delSort.dir = _delSort.col === i ? -_delSort.dir : 1;
+  _delSort.col = i;
+  buildThead('del-thead', DEL_COLS, _delSort, 'clickDelSort');
+  renderDelRows();
+}
+function renderDelRows() {
+  const tbody = document.getElementById('del-tbody');
+  if (!_delRows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No records found</td></tr>';
+    return;
+  }
+  const rows = _delSort.col >= 0 ? sortRows(_delRows, DEL_COLS[_delSort.col], _delSort.dir) : _delRows;
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td>${r['Shipment AWB']||'—'}</td>
+    <td>${r['Channel']||'—'}</td>
+    <td>${r['Transporter']||'—'}</td>
+    <td>${r['Pick up Date']||'—'}</td>
+    <td>${r['Actual Delivery Date']||'—'}</td>
+    <td>${fmtFloat(r['Prom TAT'])}</td>
+    <td>${fmtFloat(r['Actual TAT'])}</td>
+    <td>${delayBadge(r['Delay Days'])}</td>
+    <td>${r['Product Name']||'—'}</td>
+    <td>${fmtNum(r['Qty Sent'])}</td>
+    <td>${statusBadge(r['Current Status - Ship partner portal'])}</td>
+  </tr>`).join('');
+}
+
 async function loadDelivered() {
   const channels = getMsValues('ms-del-channel');
   const delWeeks = getMsValues('ms-del-week');
@@ -784,25 +867,9 @@ async function loadDelivered() {
   renderPivot(pivotData);
 
   // Detail table
-  const rows = data.rows;
-  const tbody = document.getElementById('del-tbody');
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No records found</td></tr>';
-  } else {
-    tbody.innerHTML = rows.map(r => `<tr>
-      <td>${r['Shipment AWB'] || '—'}</td>
-      <td>${r['Channel'] || '—'}</td>
-      <td>${r['Transporter'] || '—'}</td>
-      <td>${r['Pick up Date'] || '—'}</td>
-      <td>${r['Actual Delivery Date'] || '—'}</td>
-      <td>${fmtFloat(r['Prom TAT'])}</td>
-      <td>${fmtFloat(r['Actual TAT'])}</td>
-      <td>${delayBadge(r['Delay Days'])}</td>
-      <td>${r['Product Name'] || '—'}</td>
-      <td>${fmtNum(r['Qty Sent'])}</td>
-      <td>${statusBadge(r['Current Status - Ship partner portal'])}</td>
-    </tr>`).join('');
-  }
+  _delRows = data.rows;
+  buildThead('del-thead', DEL_COLS, _delSort, 'clickDelSort');
+  renderDelRows();
 }
 
 function clearDeliveredFilters() {
@@ -885,6 +952,49 @@ function togglePivotCh(chId) {
 }
 
 // ── View 3: Undelivered ──────────────────────────────────────────────────
+const UNDEL_COLS = [
+  { label:'AWB',               key:'Shipment AWB',                         type:'str'  },
+  { label:'Channel',           key:'Channel',                              type:'str'  },
+  { label:'Transporter',       key:'Transporter',                          type:'str'  },
+  { label:'Pickup Date',       key:'Pick up Date',                         type:'date' },
+  { label:'Exp Delivery',      key:'Expected Delivery Date',               type:'date' },
+  { label:'Ageing (days)',     key:'Ageing',                               type:'num'  },
+  { label:'Bucket',            key:'Ageing Bucket',                        type:'str'  },
+  { label:'Delay Days',        key:'Delay Days',                           type:'num'  },
+  { label:'Status',            key:'Current Status - Ship partner portal', type:'str'  },
+  { label:'Product',           key:'Product Name',                         type:'str'  },
+  { label:'Qty',               key:'Qty Sent',                             type:'num'  },
+];
+let _undelRows = [], _undelSort = { col: -1, dir: 1 };
+function clickUndelSort(i) {
+  _undelSort.dir = _undelSort.col === i ? -_undelSort.dir : 1;
+  _undelSort.col = i;
+  buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort');
+  renderUndelRows();
+}
+function renderUndelRows() {
+  const tbody = document.getElementById('undel-tbody');
+  if (!_undelRows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No undelivered shipments for selected filters</td></tr>';
+    return;
+  }
+  const statusKey = 'Current Status - Ship partner portal';
+  const rows = _undelSort.col >= 0 ? sortRows(_undelRows, UNDEL_COLS[_undelSort.col], _undelSort.dir) : _undelRows;
+  tbody.innerHTML = rows.map(r => `<tr class="${r.is_overdue ? 'overdue' : ''}">
+    <td>${r['Shipment AWB']||'—'}</td>
+    <td>${r['Channel']||'—'}</td>
+    <td>${r['Transporter']||'—'}</td>
+    <td>${r['Pick up Date']||'—'}</td>
+    <td>${r['Expected Delivery Date']||'—'}</td>
+    <td><strong>${r['Ageing']!==''?r['Ageing']:'—'}</strong></td>
+    <td>${bucketBadge(r['Ageing Bucket'])}</td>
+    <td>${delayBadge(r['Delay Days'])}</td>
+    <td>${statusBadge(r[statusKey])}</td>
+    <td>${r['Product Name']||'—'}</td>
+    <td>${fmtNum(r['Qty Sent'])}</td>
+  </tr>`).join('');
+}
+
 async function loadUndelivered() {
   const channels    = getMsValues('ms-undel-channel');
   const expDelWeeks = getMsValues('ms-undel-exp-week');
@@ -939,29 +1049,11 @@ async function loadUndelivered() {
   // Pivot
   renderPivotTo('undel-pivot-wrap', 'undel-pivot-updated-label', pivotData);
 
-  // Detail table
-  const tbody = document.getElementById('undel-tbody');
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No undelivered shipments for selected filters</td></tr>';
-    return;
-  }
-
-  rows.sort((a, b) => (b['Ageing'] || 0) - (a['Ageing'] || 0));
-
-  const statusKey = 'Current Status - Ship partner portal';
-  tbody.innerHTML = rows.map(r => `<tr class="${r.is_overdue ? 'overdue' : ''}">
-    <td>${r['Shipment AWB'] || '—'}</td>
-    <td>${r['Channel'] || '—'}</td>
-    <td>${r['Transporter'] || '—'}</td>
-    <td>${r['Pick up Date'] || '—'}</td>
-    <td>${r['Expected Delivery Date'] || '—'}</td>
-    <td><strong>${r['Ageing'] !== '' ? r['Ageing'] : '—'}</strong></td>
-    <td>${bucketBadge(r['Ageing Bucket'])}</td>
-    <td>${delayBadge(r['Delay Days'])}</td>
-    <td>${statusBadge(r[statusKey])}</td>
-    <td>${r['Product Name'] || '—'}</td>
-    <td>${fmtNum(r['Qty Sent'])}</td>
-  </tr>`).join('');
+  // Detail table — default sort by Ageing desc
+  if (_undelSort.col < 0) { _undelSort.col = 5; _undelSort.dir = -1; }
+  _undelRows = rows;
+  buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort');
+  renderUndelRows();
 }
 
 function clearUndeliveredFilters() {
@@ -1169,6 +1261,60 @@ async function loadTrends() {
     labels: data.monthly.map(r => r.month_label),
     datasets: [{ label: 'Deliveries', data: data.monthly.map(r => r.deliveries), backgroundColor: '#38a169', borderRadius: 6 }]
   }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
+}
+
+// ── View 9: Raw Data 2026 ────────────────────────────────────────────────
+const RAW_COL_TYPES = {
+  'Prom TAT':'num','Actual TAT':'num','Delay Days':'num','Ageing':'num','Qty Sent':'num',
+  'Pick up Date':'date','Expected Delivery Date':'date','Actual Delivery Date':'date',
+};
+let _rawRows = [], _rawCols = [], _rawSort = { col: -1, dir: 1 };
+
+function clickRawSort(i) {
+  _rawSort.dir = _rawSort.col === i ? -_rawSort.dir : 1;
+  _rawSort.col = i;
+  const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
+  buildThead('raw-thead', cols, _rawSort, 'clickRawSort');
+  renderRawRows();
+}
+
+function renderRawRows() {
+  const search = (document.getElementById('raw-search').value || '').toLowerCase();
+  const tbody = document.getElementById('raw-tbody');
+  let rows = _rawRows;
+  if (search) rows = rows.filter(r => _rawCols.some(c => String(r[c]||'').toLowerCase().includes(search)));
+  if (_rawSort.col >= 0) {
+    const col = { key: _rawCols[_rawSort.col], type: RAW_COL_TYPES[_rawCols[_rawSort.col]] || 'str' };
+    rows = sortRows(rows, col, _rawSort.dir);
+  }
+  document.getElementById('raw-count').textContent = `Showing ${rows.length.toLocaleString()} of ${_rawRows.length.toLocaleString()} rows`;
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${_rawCols.length}" style="text-align:center;padding:20px;color:#718096;">No rows match</td></tr>`;
+    return;
+  }
+  const statusKey = 'Current Status - Ship partner portal';
+  tbody.innerHTML = rows.map(r => '<tr>' + _rawCols.map(c => {
+    if (c === statusKey) return `<td>${statusBadge(r[c])}</td>`;
+    if (c === 'Delay Days') return `<td>${r[c]!==''?delayBadge(r[c]):'—'}</td>`;
+    if (c === 'Ageing Bucket') return `<td>${r[c]?bucketBadge(r[c]):'—'}</td>`;
+    return `<td>${r[c]||'—'}</td>`;
+  }).join('') + '</tr>').join('');
+}
+
+function filterRawTable() { renderRawRows(); }
+
+async function loadRawData() {
+  document.getElementById('raw-tbody').innerHTML = `<tr><td colspan="17" class="loading-state"><div class="spinner"></div> Loading…</td></tr>`;
+  const res = await fetch('/api/raw-data');
+  const data = await res.json();
+  _rawRows = data.rows;
+  _rawCols = data.columns;
+  _rawSort = { col: -1, dir: 1 };
+  document.getElementById('raw-subtitle').textContent =
+    `${data.total.toLocaleString()} shipments · Year 2026`;
+  const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
+  buildThead('raw-thead', cols, _rawSort, 'clickRawSort');
+  renderRawRows();
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────

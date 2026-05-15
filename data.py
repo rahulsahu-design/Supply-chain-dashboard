@@ -534,6 +534,29 @@ def tat_pivot(df: pd.DataFrame, channels=None, del_weeks=None, date_from=None, d
     }
 
 
+def raw_data_2026(df: pd.DataFrame) -> dict:
+    RAW_COLS = [
+        "Shipment AWB", "Channel", "Transporter", "Product Name",
+        "Pick up Date", "Expected Delivery Date", "Actual Delivery Date",
+        "Prom TAT", "Actual TAT", "Delay Days",
+        "Ageing", "Ageing Bucket", STATUS_COL, "Qty Sent",
+        "Year", "Month", "Week",
+    ]
+    try:
+        cleaned = pd.to_numeric(df["Year"].astype(str).str.strip().str.replace(',', '', regex=False), errors='coerce')
+        d = df[cleaned == 2026].copy()
+    except Exception:
+        d = df[df["Year"].astype(str).str.strip() == "2026"].copy()
+
+    cols = [c for c in RAW_COLS if c in d.columns]
+    out = d[cols].copy()
+    for dc in ["Pick up Date", "Expected Delivery Date", "Actual Delivery Date"]:
+        if dc in out.columns:
+            out[dc] = out[dc].dt.strftime("%d/%m/%Y").fillna("")
+    out = out.fillna("")
+    return {"columns": cols, "rows": out.to_dict(orient="records"), "total": len(out)}
+
+
 def tat_analysis(df: pd.DataFrame, days=7) -> list:
     cutoff = datetime.now() - timedelta(days=days)
     d = df[df["Pick up Date"] >= cutoff].copy()
