@@ -97,6 +97,18 @@ def api_tat():
     return jsonify(d.tat_analysis(_filtered_df(), days=days))
 
 
+@app.route("/api/tat-pivot")
+def api_tat_pivot():
+    df = _filtered_df()
+    channels_raw = request.args.get("channels", "All")
+    del_weeks_raw = request.args.get("del_weeks", "All")
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    channels = [c.strip() for c in channels_raw.split(",")] if channels_raw and channels_raw != "All" else None
+    del_weeks = [w.strip() for w in del_weeks_raw.split(",")] if del_weeks_raw and del_weeks_raw != "All" else None
+    return jsonify(d.tat_pivot(df, channels=channels, del_weeks=del_weeks, date_from=date_from, date_to=date_to))
+
+
 @app.route("/api/ageing")
 def api_ageing():
     return jsonify(d.shipment_ageing(_filtered_df()))

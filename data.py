@@ -465,6 +465,68 @@ def undelivered_pivot(df: pd.DataFrame, channels=None, exp_del_weeks=None,
     }
 
 
+def tat_pivot(df: pd.DataFrame, channels=None, del_weeks=None, date_from=None, date_to=None) -> dict:
+    d = df[df["is_delivered"] & df["Actual Delivery Date"].notna()].copy()
+    d = _filter_channel(d, channels)
+    d = _filter_del_week(d, del_weeks)
+    if date_from:
+        d = d[d["Actual Delivery Date"].dt.date >= pd.to_datetime(date_from).date()]
+    if date_to:
+        d = d[d["Actual Delivery Date"].dt.date <= pd.to_datetime(date_to).date()]
+
+    if d.empty:
+        return {"transporters": [], "rows": [], "totals": {}, "overall": {"count": 0, "avg_tat": None}}
+
+    d = d[d["Transporter"].notna() & (d["Transporter"].str.strip() != "")]
+
+    transporters = sorted(d["Transporter"].str.strip().unique().tolist())
+    channels_in_data = d["Channel"].dropna().unique().tolist()
+    channel_order = ["Amazon", "TikTok", "Shipbob"]
+    ordered = [c for c in channel_order if c in channels_in_data]
+    others = [c for c in channels_in_data if c not in channel_order]
+    all_channels = ordered + others
+
+    def safe_avg(series):
+        vals = series.dropna()
+        return round(float(vals.mean()), 1) if len(vals) > 0 else None
+
+    result_rows = []
+    for ch in all_channels:
+        ch_df = d[d["Channel"] == ch]
+        cells = {}
+        for t in transporters:
+            t_df = ch_df[ch_df["Transporter"].str.strip() == t]
+            count = len(t_df)
+            cells[t] = {
+                "count": count if count > 0 else None,
+                "avg_tat": safe_avg(t_df["Actual TAT"]) if count > 0 and "Actual TAT" in t_df.columns else None,
+            }
+        result_rows.append({
+            "channel": ch,
+            "cells": cells,
+            "row_total": len(ch_df),
+            "row_avg_tat": safe_avg(ch_df["Actual TAT"]) if "Actual TAT" in ch_df.columns else None,
+        })
+
+    totals = {}
+    for t in transporters:
+        t_df = d[d["Transporter"].str.strip() == t]
+        totals[t] = {
+            "count": len(t_df),
+            "avg_tat": safe_avg(t_df["Actual TAT"]) if "Actual TAT" in t_df.columns else None,
+        }
+
+    return {
+        "transporters": transporters,
+        "rows": result_rows,
+        "totals": totals,
+        "overall": {
+            "count": len(d),
+            "avg_tat": safe_avg(d["Actual TAT"]) if "Actual TAT" in d.columns else None,
+        },
+    }
+
+
 def tat_analysis(df: pd.DataFrame, days=7) -> list:
     cutoff = datetime.now() - timedelta(days=days)
     d = df[df["Pick up Date"] >= cutoff].copy()
