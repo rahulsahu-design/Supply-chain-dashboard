@@ -139,10 +139,17 @@ def get_filter_options(df: pd.DataFrame) -> dict:
             weeks_iso = exp_dates.dt.isocalendar().week.dropna().astype(int).unique().tolist()
             exp_del_weeks = sorted([str(w) for w in weeks_iso])
             exp_del_years = sorted(exp_dates.dt.year.dropna().astype(int).unique().tolist())
+    max_del_date = None
+    if "Actual Delivery Date" in df.columns:
+        mx = df["Actual Delivery Date"].dropna().max()
+        if pd.notna(mx):
+            max_del_date = mx.strftime("%Y-%m-%d")
+
     return {
         "years": years, "months": months, "weeks": weeks, "del_weeks": del_weeks,
         "exp_del_weeks": exp_del_weeks,
         "exp_del_years": [str(y) for y in exp_del_years],
+        "max_delivery_date": max_del_date,
     }
 
 

@@ -147,6 +147,14 @@
             <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-del-week',this)" checked> All</label>
           </div>
         </div>
+        <label>Period</label>
+        <select id="del-period" onchange="applyPeriod(this,'del-from','del-to',loadDelivered)">
+          <option value="">All</option>
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="60">Last 60 days</option>
+        </select>
         <label>Delivery From</label>
         <input type="date" id="del-from">
         <label>To</label>
@@ -315,6 +323,14 @@
           </div>
         </div>
 
+        <label>Period</label>
+        <select id="tat-period" onchange="applyPeriod(this,'tat-from','tat-to',loadTAT)">
+          <option value="">All</option>
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="60">Last 60 days</option>
+        </select>
         <label>Delivery From</label>
         <input type="date" id="tat-from">
         <label>To</label>
@@ -478,6 +494,7 @@ function clearFilters() {
 }
 
 let _forceRefresh = false;
+let _maxDeliveryDate = null;
 
 function apiFetch(path, extraParams) {
   const p = getFilterParams();
@@ -499,6 +516,8 @@ async function loadFilterOptions() {
 
   const weekSel = document.getElementById('gf-week');
   opts.weeks.forEach(w => { const o = document.createElement('option'); o.value = o.textContent = 'W' + w; o.value = w; weekSel.appendChild(o); });
+
+  _maxDeliveryDate = opts.max_delivery_date || null;
 
   // Populate del-week multi-select
   const panel = document.getElementById('ms-del-week-panel');
@@ -706,6 +725,22 @@ async function loadSummary() {
   }, { ...CHART_DEFAULTS, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } });
 }
 
+// ── Period quick-select helper ──────────────────────────────────────────────
+function applyPeriod(selectEl, fromId, toId, loadFn) {
+  const days = parseInt(selectEl.value);
+  if (!days) {
+    document.getElementById(fromId).value = '';
+    document.getElementById(toId).value = '';
+  } else {
+    const maxDate = _maxDeliveryDate ? new Date(_maxDeliveryDate) : new Date();
+    const fromDate = new Date(maxDate);
+    fromDate.setDate(fromDate.getDate() - days + 1);
+    document.getElementById(fromId).value = fromDate.toISOString().split('T')[0];
+    document.getElementById(toId).value = maxDate.toISOString().split('T')[0];
+  }
+  loadFn();
+}
+
 // ── View 2: Delivered ────────────────────────────────────────────────────
 async function loadDelivered() {
   const channels = getMsValues('ms-del-channel');
@@ -779,6 +814,7 @@ function clearDeliveredFilters() {
     if (allCb) allCb.checked = true;
     updateMsLabel(id);
   });
+  document.getElementById('del-period').value = '';
   document.getElementById('del-from').value = '';
   document.getElementById('del-to').value = '';
   loadDelivered();
@@ -1036,6 +1072,7 @@ function clearTATFilters() {
     if (allCb) allCb.checked = true;
     updateMsLabel(id);
   });
+  document.getElementById('tat-period').value = '';
   document.getElementById('tat-from').value = '';
   document.getElementById('tat-to').value = '';
   loadTAT();
