@@ -552,8 +552,8 @@ def raw_data_2026(df: pd.DataFrame) -> dict:
     out = d[cols].copy()
     for dc in ["Pick up Date", "Expected Delivery Date", "Actual Delivery Date"]:
         if dc in out.columns:
-            out[dc] = out[dc].dt.strftime("%d/%m/%Y").fillna("")
-    out = out.fillna("")
+            out[dc] = out[dc].apply(lambda x: x.strftime("%d/%m/%Y") if pd.notna(x) else "")
+    out = out.fillna("").astype(str).replace("nan", "").replace("<NA>", "")
     return {"columns": cols, "rows": out.to_dict(orient="records"), "total": len(out)}
 
 

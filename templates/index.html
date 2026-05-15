@@ -1304,17 +1304,28 @@ function renderRawRows() {
 function filterRawTable() { renderRawRows(); }
 
 async function loadRawData() {
-  document.getElementById('raw-tbody').innerHTML = `<tr><td colspan="17" class="loading-state"><div class="spinner"></div> Loading…</td></tr>`;
-  const res = await fetch('/api/raw-data');
-  const data = await res.json();
-  _rawRows = data.rows;
-  _rawCols = data.columns;
-  _rawSort = { col: -1, dir: 1 };
-  document.getElementById('raw-subtitle').textContent =
-    `${data.total.toLocaleString()} shipments · Year 2026`;
-  const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
-  buildThead('raw-thead', cols, _rawSort, 'clickRawSort');
-  renderRawRows();
+  const tbody = document.getElementById('raw-tbody');
+  tbody.innerHTML = `<tr><td colspan="17" class="loading-state"><div class="spinner"></div> Loading…</td></tr>`;
+  try {
+    const res = await fetch('/api/raw-data');
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`Server ${res.status}: ${txt.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    _rawRows = data.rows || [];
+    _rawCols = data.columns || [];
+    _rawSort = { col: -1, dir: 1 };
+    document.getElementById('raw-subtitle').textContent =
+      `${(data.total || 0).toLocaleString()} shipments · Year 2026`;
+    const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
+    if (cols.length) buildThead('raw-thead', cols, _rawSort, 'clickRawSort');
+    renderRawRows();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="17" style="text-align:center;padding:20px;color:#e53e3e;font-size:13px;">
+      Failed to load: ${err.message}</td></tr>`;
+    console.error('loadRawData error:', err);
+  }
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
