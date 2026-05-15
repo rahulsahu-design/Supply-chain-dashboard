@@ -289,7 +289,7 @@ def delivered_shipments(df: pd.DataFrame, channel=None, del_week=None, date_from
     out = d[cols].copy()
     for dc in ["Pick up Date", "Actual Delivery Date"]:
         if dc in out.columns:
-            out[dc] = out[dc].dt.strftime("%d/%m/%Y").fillna("")
+            out[dc] = out[dc].apply(lambda x: x.strftime("%d/%m/%Y") if pd.notna(x) else "")
     return out.fillna("").to_dict(orient="records")
 
 
@@ -412,7 +412,7 @@ def undelivered_shipments(df: pd.DataFrame, channel=None, exp_del_week=None,
     out = d[cols].copy()
     for dc in ["Pick up Date", "Expected Delivery Date"]:
         if dc in out.columns:
-            out[dc] = out[dc].dt.strftime("%d/%m/%Y").fillna("")
+            out[dc] = out[dc].apply(lambda x: x.strftime("%d/%m/%Y") if pd.notna(x) else "")
     if "is_overdue" in out.columns:
         out["is_overdue"] = out["is_overdue"].astype(bool)
     return out.fillna("").to_dict(orient="records")

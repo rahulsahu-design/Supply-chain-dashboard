@@ -782,12 +782,107 @@ function sortRows(rows, col, dir) {
     return va < vb ? -dir : va > vb ? dir : 0;
   });
 }
-function buildThead(theadId, cols, sortState, clickFn) {
+// column filter state: { del:{}, undel:{}, raw:{} } — keys are colIdx, values are Sets of strings
+const _tableFilters = { del: {}, undel: {}, raw: {} };
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function applyColFilters(rows, cols, filterState) {
+  return rows.filter(r => {
+    for (const [idxStr, valSet] of Object.entries(filterState)) {
+      if (!valSet || valSet.size === 0) continue;
+      const col = cols[parseInt(idxStr)];
+      if (!col) continue;
+      if (!valSet.has(String(r[col.key] ?? ''))) return false;
+    }
+    return true;
+  });
+}
+
+function buildThead(theadId, cols, sortState, clickFn, filterKey) {
+  const fs = filterKey ? _tableFilters[filterKey] : null;
   document.getElementById(theadId).innerHTML = '<tr>' + cols.map((col, i) => {
     const active = sortState.col === i;
     const arrow  = active ? (sortState.dir === 1 ? '▲' : '▼') : '⇅';
-    return `<th onclick="${clickFn}(${i})" style="cursor:pointer;white-space:nowrap;user-select:none;" title="Sort by ${col.label}">${col.label} <span style="font-size:9px;opacity:${active?1:0.3};vertical-align:middle;">${arrow}</span></th>`;
+    const hasF   = fs && fs[i];
+    const fIcon  = filterKey
+      ? `<span onclick="event.stopPropagation();colFilterClick('${filterKey}',${i},this)"
+           style="margin-left:3px;cursor:pointer;font-size:10px;vertical-align:middle;${hasF ? 'color:var(--green-800);font-weight:700;' : 'opacity:0.3;'}"
+           title="${hasF ? 'Filter active — click to change' : 'Filter column'}">▾</span>`
+      : '';
+    return `<th onclick="${clickFn}(${i})" style="cursor:pointer;white-space:nowrap;user-select:none;" title="Sort by ${col.label}">${col.label}<span style="font-size:9px;opacity:${active?1:0.3};vertical-align:middle;">${arrow}</span>${fIcon}</th>`;
   }).join('') + '</tr>';
+}
+
+function colFilterClick(tableKey, colIdx, triggerEl) {
+  let cols, rows, sortState, sortFn, theadId, renderFn;
+  if (tableKey === 'del')   { cols = DEL_COLS;   rows = _delRows;   sortState = _delSort;   sortFn = 'clickDelSort';   theadId = 'del-thead';   renderFn = renderDelRows; }
+  else if (tableKey === 'undel') { cols = UNDEL_COLS; rows = _undelRows; sortState = _undelSort; sortFn = 'clickUndelSort'; theadId = 'undel-thead'; renderFn = renderUndelRows; }
+  else { cols = _rawCols.map(c => ({label:c,key:c,type:RAW_COL_TYPES[c]||'str'})); rows = _rawRows; sortState = _rawSort; sortFn = 'clickRawSort'; theadId = 'raw-thead'; renderFn = renderRawRows; }
+  openColFilter(tableKey, colIdx, cols, rows, sortState, sortFn, theadId, renderFn, triggerEl);
+}
+
+function openColFilter(tableKey, colIdx, cols, allRows, sortState, sortFn, theadId, renderFn, triggerEl) {
+  document.querySelectorAll('.cf-panel').forEach(p => p.remove());
+  const col = cols[colIdx];
+  const fs = _tableFilters[tableKey];
+  const allVals = [...new Set(allRows.map(r => String(r[col.key] ?? '')))].sort((a, b) => {
+    const na = parseFloat(a), nb = parseFloat(b);
+    return (!isNaN(na) && !isNaN(nb)) ? na - nb : a.localeCompare(b);
+  });
+  const current = fs[colIdx];
+  const selected = current ? new Set([...current]) : new Set(allVals);
+  const panel = document.createElement('div');
+  panel.className = 'cf-panel';
+  panel.style.cssText = 'position:fixed;background:#fff;border:1px solid #d6d0c7;border-radius:8px;padding:10px;box-shadow:0 6px 20px rgba(0,0,0,0.15);min-width:190px;max-height:320px;overflow-y:auto;z-index:9999;font-size:13px;';
+  const rect = triggerEl.getBoundingClientRect();
+  panel.style.top  = (rect.bottom + 4) + 'px';
+  panel.style.left = Math.max(4, Math.min(rect.left, window.innerWidth - 210)) + 'px';
+  const allChk = selected.size >= allVals.length;
+  panel.innerHTML = `
+    <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Filter: ${escHtml(col.label)}</div>
+    <label style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #eee;margin-bottom:6px;cursor:pointer;font-weight:600;">
+      <input type="checkbox" id="cf-all" ${allChk?'checked':''}> Select All (${allVals.length})
+    </label>
+    <div id="cf-list">
+      ${allVals.map(v=>`<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;">
+        <input type="checkbox" class="cf-item" value="${escHtml(v)}" ${selected.has(v)?'checked':''}>
+        <span style="max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${v||'<em style="color:#aaa">(blank)</em>'}</span>
+      </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid #eee;">
+      <button id="cf-apply" style="flex:1;padding:5px 8px;background:#1b4332;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Apply</button>
+      <button id="cf-clear" style="flex:1;padding:5px 8px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;cursor:pointer;font-size:12px;">Clear</button>
+    </div>`;
+  document.body.appendChild(panel);
+  const allCb = panel.querySelector('#cf-all');
+  allCb.addEventListener('change', () => panel.querySelectorAll('.cf-item').forEach(cb => cb.checked = allCb.checked));
+  panel.querySelectorAll('.cf-item').forEach(cb => cb.addEventListener('change', () => {
+    const all = panel.querySelectorAll('.cf-item'), chk = panel.querySelectorAll('.cf-item:checked');
+    allCb.indeterminate = chk.length > 0 && chk.length < all.length;
+    allCb.checked = chk.length === all.length;
+  }));
+  panel.querySelector('#cf-apply').addEventListener('click', () => {
+    const chk = [...panel.querySelectorAll('.cf-item:checked')].map(cb => cb.value);
+    if (chk.length >= allVals.length) delete fs[colIdx];
+    else fs[colIdx] = new Set(chk);
+    panel.remove();
+    buildThead(theadId, cols, sortState, sortFn, tableKey);
+    renderFn();
+  });
+  panel.querySelector('#cf-clear').addEventListener('click', () => {
+    delete fs[colIdx];
+    panel.remove();
+    buildThead(theadId, cols, sortState, sortFn, tableKey);
+    renderFn();
+  });
+  setTimeout(() => {
+    document.addEventListener('click', function h(e) {
+      if (!panel.contains(e.target)) { panel.remove(); document.removeEventListener('click', h); }
+    });
+  }, 50);
 }
 
 // ── View 2: Delivered ────────────────────────────────────────────────────
@@ -808,7 +903,7 @@ let _delRows = [], _delSort = { col: -1, dir: 1 };
 function clickDelSort(i) {
   _delSort.dir = _delSort.col === i ? -_delSort.dir : 1;
   _delSort.col = i;
-  buildThead('del-thead', DEL_COLS, _delSort, 'clickDelSort');
+  buildThead('del-thead', DEL_COLS, _delSort, 'clickDelSort', 'del');
   renderDelRows();
 }
 function renderDelRows() {
@@ -817,7 +912,8 @@ function renderDelRows() {
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#718096;">No records found</td></tr>';
     return;
   }
-  const rows = _delSort.col >= 0 ? sortRows(_delRows, DEL_COLS[_delSort.col], _delSort.dir) : _delRows;
+  let rows = applyColFilters(_delRows, DEL_COLS, _tableFilters.del);
+  if (_delSort.col >= 0) rows = sortRows(rows, DEL_COLS[_delSort.col], _delSort.dir);
   tbody.innerHTML = rows.map(r => `<tr>
     <td>${r['Shipment AWB']||'—'}</td>
     <td>${r['Channel']||'—'}</td>
@@ -879,7 +975,7 @@ async function loadDelivered() {
 
   // Detail table
   _delRows = data.rows;
-  buildThead('del-thead', DEL_COLS, _delSort, 'clickDelSort');
+  buildThead('del-thead', DEL_COLS, _delSort, 'clickDelSort', 'del');
   renderDelRows();
 }
 
@@ -981,7 +1077,7 @@ let _undelRows = [], _undelSort = { col: -1, dir: 1 };
 function clickUndelSort(i) {
   _undelSort.dir = _undelSort.col === i ? -_undelSort.dir : 1;
   _undelSort.col = i;
-  buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort');
+  buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort', 'undel');
   renderUndelRows();
 }
 function renderUndelRows() {
@@ -991,7 +1087,8 @@ function renderUndelRows() {
     return;
   }
   const statusKey = 'Current Status - Ship partner portal';
-  const rows = _undelSort.col >= 0 ? sortRows(_undelRows, UNDEL_COLS[_undelSort.col], _undelSort.dir) : _undelRows;
+  let rows = applyColFilters(_undelRows, UNDEL_COLS, _tableFilters.undel);
+  if (_undelSort.col >= 0) rows = sortRows(rows, UNDEL_COLS[_undelSort.col], _undelSort.dir);
   tbody.innerHTML = rows.map(r => `<tr class="${r.is_overdue ? 'overdue' : ''}">
     <td>${r['Shipment AWB']||'—'}</td>
     <td>${r['Channel']||'—'}</td>
@@ -1064,7 +1161,7 @@ async function loadUndelivered() {
   // Detail table — default sort by Ageing desc
   if (_undelSort.col < 0) { _undelSort.col = 5; _undelSort.dir = -1; }
   _undelRows = rows;
-  buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort');
+  buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort', 'undel');
   renderUndelRows();
 }
 
@@ -1286,14 +1383,15 @@ function clickRawSort(i) {
   _rawSort.dir = _rawSort.col === i ? -_rawSort.dir : 1;
   _rawSort.col = i;
   const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
-  buildThead('raw-thead', cols, _rawSort, 'clickRawSort');
+  buildThead('raw-thead', cols, _rawSort, 'clickRawSort', 'raw');
   renderRawRows();
 }
 
 function renderRawRows() {
   const search = (document.getElementById('raw-search').value || '').toLowerCase();
   const tbody = document.getElementById('raw-tbody');
-  let rows = _rawRows;
+  const rawCols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
+  let rows = applyColFilters(_rawRows, rawCols, _tableFilters.raw);
   if (search) rows = rows.filter(r => _rawCols.some(c => String(r[c]||'').toLowerCase().includes(search)));
   if (_rawSort.col >= 0) {
     const col = { key: _rawCols[_rawSort.col], type: RAW_COL_TYPES[_rawCols[_rawSort.col]] || 'str' };
@@ -1331,7 +1429,7 @@ async function loadRawData() {
     document.getElementById('raw-data-subtitle').textContent =
       `${(data.total || 0).toLocaleString()} shipments · Year 2026`;
     const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
-    if (cols.length) buildThead('raw-thead', cols, _rawSort, 'clickRawSort');
+    if (cols.length) buildThead('raw-thead', cols, _rawSort, 'clickRawSort', 'raw');
     renderRawRows();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="17" style="text-align:center;padding:20px;color:#e53e3e;font-size:13px;">
