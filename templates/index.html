@@ -732,11 +732,11 @@ function applyPeriod(selectEl, fromId, toId, loadFn) {
     document.getElementById(fromId).value = '';
     document.getElementById(toId).value = '';
   } else {
-    const maxDate = _maxDeliveryDate ? new Date(_maxDeliveryDate) : new Date();
-    const fromDate = new Date(maxDate);
-    fromDate.setDate(fromDate.getDate() - days + 1);
+    const today = new Date();
+    const fromDate = new Date(today);
+    fromDate.setDate(today.getDate() - days + 1);
     document.getElementById(fromId).value = fromDate.toISOString().split('T')[0];
-    document.getElementById(toId).value = maxDate.toISOString().split('T')[0];
+    document.getElementById(toId).value = today.toISOString().split('T')[0];
   }
   loadFn();
 }
