@@ -131,6 +131,8 @@
 
       <!-- Filter bar with multi-selects -->
       <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <label>Year</label>
+        <select id="del-year"><option value="All">All Years</option></select>
         <label>Channel</label>
         <div class="ms-dropdown" id="ms-del-channel" data-all-label="All Channels">
           <button class="ms-trigger" type="button" onclick="toggleMs('ms-del-channel')">
@@ -556,6 +558,12 @@ async function loadFilterOptions() {
     expWeekPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-undel-exp-week',this)"> W${w}</label>`;
   });
 
+  // Populate delivered year dropdown
+  const delYearSel = document.getElementById('del-year');
+  (opts.del_years || opts.years || []).forEach(y => {
+    const o = document.createElement('option'); o.value = o.textContent = y; delYearSel.appendChild(o);
+  });
+
   // Populate TAT del-week multi-select
   const tatDelWeekPanel = document.getElementById('ms-tat-del-week-panel');
   (opts.del_weeks || []).forEach(w => {
@@ -828,20 +836,23 @@ function renderDelRows() {
 async function loadDelivered() {
   const channels = getMsValues('ms-del-channel');
   const delWeeks = getMsValues('ms-del-week');
-  const from = document.getElementById('del-from').value;
-  const to   = document.getElementById('del-to').value;
+  const from    = document.getElementById('del-from').value;
+  const to      = document.getElementById('del-to').value;
+  const delYear = document.getElementById('del-year').value;
 
   const extra = new URLSearchParams();
   if (channels.length) extra.set('channel', channels.join(','));
   if (delWeeks.length) extra.set('del_week', delWeeks.join(','));
   if (from) extra.set('from', from);
   if (to)   extra.set('to', to);
+  if (delYear && delYear !== 'All') extra.set('del_year', delYear);
 
   const pivotExtra = new URLSearchParams();
   if (channels.length) pivotExtra.set('channels', channels.join(','));
   if (delWeeks.length) pivotExtra.set('del_weeks', delWeeks.join(','));
   if (from) pivotExtra.set('from', from);
   if (to)   pivotExtra.set('to', to);
+  if (delYear && delYear !== 'All') pivotExtra.set('del_year', delYear);
 
   // Fire charts+table and pivot in parallel
   const [res, pivotRes] = await Promise.all([
@@ -881,6 +892,7 @@ function clearDeliveredFilters() {
     if (allCb) allCb.checked = true;
     updateMsLabel(id);
   });
+  document.getElementById('del-year').value = 'All';
   document.getElementById('del-period').value = '';
   document.getElementById('del-from').value = '';
   document.getElementById('del-to').value = '';

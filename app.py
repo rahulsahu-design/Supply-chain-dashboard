@@ -44,10 +44,11 @@ def api_delivered():
     del_week_raw = request.args.get("del_week", "All")
     date_from = request.args.get("from")
     date_to = request.args.get("to")
+    del_year = request.args.get("del_year")
     channels = [c.strip() for c in channel_raw.split(",")] if channel_raw and channel_raw != "All" else None
     del_weeks = [w.strip() for w in del_week_raw.split(",")] if del_week_raw and del_week_raw != "All" else None
-    rows = d.delivered_shipments(df, channel=channels, del_week=del_weeks, date_from=date_from, date_to=date_to)
-    charts = d.delivered_by_date_channel(df, channel=channels, del_week=del_weeks, date_from=date_from, date_to=date_to)
+    rows = d.delivered_shipments(df, channel=channels, del_week=del_weeks, date_from=date_from, date_to=date_to, year=del_year)
+    charts = d.delivered_by_date_channel(df, channel=channels, del_week=del_weeks, date_from=date_from, date_to=date_to, year=del_year)
     return jsonify({"rows": rows, "charts": charts})
 
 
@@ -58,9 +59,10 @@ def api_delivered_pivot():
     del_weeks_raw = request.args.get("del_weeks", "All")
     date_from = request.args.get("from")
     date_to = request.args.get("to")
+    del_year = request.args.get("del_year")
     channels = [c.strip() for c in channels_raw.split(",")] if channels_raw and channels_raw != "All" else None
     del_weeks = [w.strip() for w in del_weeks_raw.split(",")] if del_weeks_raw and del_weeks_raw != "All" else None
-    return jsonify(d.delivered_pivot(df, channels=channels, del_weeks=del_weeks, date_from=date_from, date_to=date_to))
+    return jsonify(d.delivered_pivot(df, channels=channels, del_weeks=del_weeks, date_from=date_from, date_to=date_to, year=del_year))
 
 
 @app.route("/api/undelivered")

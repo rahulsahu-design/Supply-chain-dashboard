@@ -140,13 +140,16 @@ def get_filter_options(df: pd.DataFrame) -> dict:
             exp_del_weeks = sorted([str(w) for w in weeks_iso])
             exp_del_years = sorted(exp_dates.dt.year.dropna().astype(int).unique().tolist())
     max_del_date = None
+    del_years = []
     if "Actual Delivery Date" in df.columns:
         mx = df["Actual Delivery Date"].dropna().max()
         if pd.notna(mx):
             max_del_date = mx.strftime("%Y-%m-%d")
+        del_years = sorted(df["Actual Delivery Date"].dropna().dt.year.unique().astype(int).tolist())
 
     return {
         "years": years, "months": months, "weeks": weeks, "del_weeks": del_weeks,
+        "del_years": [str(y) for y in del_years],
         "exp_del_weeks": exp_del_weeks,
         "exp_del_years": [str(y) for y in exp_del_years],
         "max_delivery_date": max_del_date,
@@ -258,8 +261,18 @@ def _active_undelivered_mask(df):
     return ~status.isin(EXCLUDED_UNDELIVERED_STATUSES) & (status != "")
 
 
-def delivered_shipments(df: pd.DataFrame, channel=None, del_week=None, date_from=None, date_to=None) -> list:
+def _filter_del_year(d, year):
+    if year and year != "All" and "Actual Delivery Date" in d.columns:
+        try:
+            d = d[d["Actual Delivery Date"].dt.year == int(float(str(year).strip()))]
+        except (ValueError, TypeError):
+            pass
+    return d
+
+
+def delivered_shipments(df: pd.DataFrame, channel=None, del_week=None, date_from=None, date_to=None, year=None) -> list:
     d = df[df["is_delivered"]].copy()
+    d = _filter_del_year(d, year)
     d = _filter_channel(d, channel)
     d = _filter_del_week(d, del_week)
     if date_from:
@@ -280,8 +293,9 @@ def delivered_shipments(df: pd.DataFrame, channel=None, del_week=None, date_from
     return out.fillna("").to_dict(orient="records")
 
 
-def delivered_by_date_channel(df: pd.DataFrame, channel=None, del_week=None, date_from=None, date_to=None) -> dict:
+def delivered_by_date_channel(df: pd.DataFrame, channel=None, del_week=None, date_from=None, date_to=None, year=None) -> dict:
     d = df[df["is_delivered"] & df["Actual Delivery Date"].notna()].copy()
+    d = _filter_del_year(d, year)
     d = _filter_channel(d, channel)
     d = _filter_del_week(d, del_week)
     if date_from:
@@ -299,8 +313,9 @@ def delivered_by_date_channel(df: pd.DataFrame, channel=None, del_week=None, dat
     }
 
 
-def delivered_pivot(df: pd.DataFrame, channels=None, del_weeks=None, date_from=None, date_to=None, days=14) -> dict:
+def delivered_pivot(df: pd.DataFrame, channels=None, del_weeks=None, date_from=None, date_to=None, days=14, year=None) -> dict:
     d = df[df["is_delivered"] & df["Actual Delivery Date"].notna() & df["Qty Sent"].notna()].copy()
+    d = _filter_del_year(d, year)
     d = _filter_channel(d, channels)
     d = _filter_del_week(d, del_weeks)
     if date_from:
