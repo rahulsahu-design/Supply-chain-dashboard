@@ -1022,43 +1022,48 @@ function renderTATPivot(data) {
   document.getElementById('tat-pivot-label').textContent =
     'Updated: ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
 
+  // Two-row header: transporter name spans 2 cols, sub-headers Count | Avg TAT
   let html = '<table class="pivot-table"><thead><tr>';
-  html += '<th>Channel</th>';
-  transporters.forEach(t => { html += `<th style="text-align:center;min-width:110px;">${t}</th>`; });
-  html += '<th class="pivot-col-total" style="text-align:center;">Total</th></tr></thead><tbody>';
+  html += '<th rowspan="2" style="vertical-align:bottom;">Channel</th>';
+  transporters.forEach(t => {
+    html += `<th colspan="2" style="text-align:center;border-bottom:1px solid var(--border-light);min-width:130px;">${t}</th>`;
+  });
+  html += '<th colspan="2" class="pivot-col-total" style="text-align:center;">Total</th></tr>';
+  html += '<tr>';
+  transporters.forEach(() => {
+    html += '<th style="text-align:center;font-size:11px;font-weight:600;color:var(--text-400);min-width:55px;padding-top:4px;">Count</th>';
+    html += '<th style="text-align:center;font-size:11px;font-weight:600;color:var(--text-400);min-width:70px;padding-top:4px;">Avg TAT</th>';
+  });
+  html += '<th class="pivot-col-total" style="text-align:center;font-size:11px;font-weight:600;padding-top:4px;">Count</th>';
+  html += '<th class="pivot-col-total" style="text-align:center;font-size:11px;font-weight:600;padding-top:4px;">Avg TAT</th>';
+  html += '</tr></thead><tbody>';
 
   rows.forEach(row => {
     html += `<tr class="pivot-ch-row"><td><strong>${row.channel}</strong></td>`;
     transporters.forEach(t => {
       const c = row.cells[t];
       if (c && c.count) {
-        html += `<td style="text-align:center;">
-          <div style="font-weight:700;font-size:15px;">${c.count}</div>
-          <div style="font-size:10px;color:var(--text-400);margin-top:2px;">${c.avg_tat != null ? c.avg_tat + 'd avg' : '—'}</div>
-        </td>`;
+        html += `<td style="text-align:center;font-weight:700;font-size:14px;">${c.count}</td>`;
+        html += `<td style="text-align:center;color:var(--text-500);font-size:13px;">${c.avg_tat != null ? c.avg_tat + 'd' : '—'}</td>`;
       } else {
-        html += `<td></td>`;
+        html += `<td></td><td style="text-align:center;color:var(--text-300);">—</td>`;
       }
     });
-    html += `<td class="pivot-col-total" style="text-align:center;">
-      <div style="font-weight:700;font-size:15px;">${row.row_total}</div>
-      <div style="font-size:10px;color:var(--text-400);margin-top:2px;">${row.row_avg_tat != null ? row.row_avg_tat + 'd avg' : '—'}</div>
-    </td></tr>`;
+    html += `<td class="pivot-col-total" style="text-align:center;font-weight:700;font-size:14px;">${row.row_total}</td>`;
+    html += `<td class="pivot-col-total" style="text-align:center;font-size:13px;">${row.row_avg_tat != null ? row.row_avg_tat + 'd' : '—'}</td>`;
+    html += '</tr>';
   });
 
   // Grand total row
   html += '<tr class="pivot-total-row"><td><strong>Grand Total</strong></td>';
   transporters.forEach(t => {
     const tot = totals[t];
-    html += `<td style="text-align:center;">
-      <div style="font-weight:700;">${tot ? tot.count : ''}</div>
-      <div style="font-size:10px;opacity:0.65;margin-top:2px;">${tot && tot.avg_tat != null ? tot.avg_tat + 'd avg' : ''}</div>
-    </td>`;
+    html += `<td style="text-align:center;font-weight:700;">${tot ? (tot.count || '') : ''}</td>`;
+    html += `<td style="text-align:center;opacity:0.8;">${tot && tot.avg_tat != null ? tot.avg_tat + 'd' : ''}</td>`;
   });
-  html += `<td class="pivot-col-total" style="text-align:center;">
-    <div style="font-weight:800;">${overall.count}</div>
-    <div style="font-size:10px;opacity:0.65;margin-top:2px;">${overall.avg_tat != null ? overall.avg_tat + 'd avg' : ''}</div>
-  </td></tr>`;
+  html += `<td class="pivot-col-total" style="text-align:center;font-weight:800;">${overall.count}</td>`;
+  html += `<td class="pivot-col-total" style="text-align:center;opacity:0.8;">${overall.avg_tat != null ? overall.avg_tat + 'd' : ''}</td>`;
+  html += '</tr>';
 
   html += '</tbody></table>';
   wrap.innerHTML = html;
