@@ -1328,7 +1328,7 @@ async function loadRawData() {
     _rawRows = data.rows || [];
     _rawCols = data.columns || [];
     _rawSort = { col: -1, dir: 1 };
-    document.getElementById('raw-subtitle').textContent =
+    document.getElementById('raw-data-subtitle').textContent =
       `${(data.total || 0).toLocaleString()} shipments · Year 2026`;
     const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
     if (cols.length) buildThead('raw-thead', cols, _rawSort, 'clickRawSort');
