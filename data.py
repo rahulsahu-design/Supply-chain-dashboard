@@ -97,6 +97,14 @@ def fetch_data(force=False) -> pd.DataFrame:
                 recalc = prom_null & df["Actual TAT"].notna()
                 df.loc[recalc, "Delay Days"] = df.loc[recalc, "Actual TAT"] - df.loc[recalc, "Prom TAT"]
 
+    # Drop 2024 and earlier — keep Jan 2025 onwards for performance
+    if "Year" in df.columns:
+        year_num = pd.to_numeric(
+            df["Year"].astype(str).str.strip().str.replace(',', '', regex=False),
+            errors='coerce'
+        )
+        df = df[year_num.isna() | (year_num >= 2025)].copy()
+
     # Derived flags
     df["is_delivered"] = df[STATUS_COL].str.strip().isin(DELIVERED_STATUSES)
 
