@@ -175,25 +175,27 @@
         <button class="gf-clear-btn" onclick="clearDeliveredFilters()">✕ Clear</button>
       </div>
 
-      <!-- Charts -->
-      <div class="chart-row" style="margin-bottom:24px;">
-        <div class="card">
-          <h3>Deliveries by Date</h3>
-          <div class="chart-wrap"><canvas id="chart-del-date"></canvas></div>
-        </div>
-        <div class="card">
-          <h3>Deliveries by Channel</h3>
-          <div class="chart-wrap"><canvas id="chart-del-channel"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Pivot table -->
+      <!-- Delivered pivot table -->
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid #e2e8f0;">
           <span style="font-size:12px;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;">SUM of Qty Delivered — Channel × Date</span>
           <span id="pivot-updated-label" style="font-size:11px;color:#718096;"></span>
         </div>
         <div id="pivot-wrap" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <!-- TAT KPIs -->
+      <div class="kpi-grid" id="del-tat-kpis" style="margin-bottom:24px;"></div>
+
+      <!-- TAT pivot table -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid var(--border-light);">
+          <span style="font-size:12px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.5px;">Deliveries &amp; Avg TAT — Channel × Transporter</span>
+          <span id="del-tat-pivot-label" style="font-size:11px;color:var(--text-400);"></span>
+        </div>
+        <div id="del-tat-pivot-wrap" style="overflow-x:auto;">
           <div class="loading-state"><div class="spinner"></div> Loading…</div>
         </div>
       </div>
@@ -1125,28 +1127,33 @@ async function loadDelivered() {
   if (to)   pivotExtra.set('to', to);
   if (delYear && delYear !== 'All') pivotExtra.set('del_year', delYear);
 
-  // Fire charts+table and pivot in parallel
-  const [res, pivotRes] = await Promise.all([
+  // Fire all three in parallel
+  const [res, pivotRes, tatRes] = await Promise.all([
     apiFetch('/api/delivered', extra),
     apiFetch('/api/delivered-pivot', pivotExtra),
+    apiFetch('/api/tat-pivot', pivotExtra),
   ]);
   const data      = await res.json();
   const pivotData = await pivotRes.json();
+  const tatData   = await tatRes.json();
 
-  // Charts
-  const ch = data.charts;
-  getChart('chart-del-date', 'bar', {
-    labels: ch.by_date.map(r => r.delivery_date),
-    datasets: [{ label: 'Deliveries', data: ch.by_date.map(r => r.count), backgroundColor: '#4f8ef7', borderRadius: 4 }]
-  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
-
-  getChart('chart-del-channel', 'doughnut', {
-    labels: ch.by_channel.map(r => r.Channel),
-    datasets: [{ data: ch.by_channel.map(r => r.count), backgroundColor: PALETTE, borderWidth: 2 }]
-  }, { ...CHART_DEFAULTS });
-
-  // Pivot
+  // Delivered pivot
   renderPivot(pivotData);
+
+  // TAT KPIs
+  document.getElementById('del-tat-kpis').innerHTML = `
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">Total Deliveries</div>
+      <div class="kpi-value">${fmtNum(tatData.overall.count)}</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Overall Avg TAT</div>
+      <div class="kpi-value">${fmtFloat(tatData.overall.avg_tat)}<span style="font-size:16px;font-weight:600;margin-left:4px;">days</span></div>
+    </div>
+  `;
+
+  // TAT pivot
+  renderTATPivotTo('del-tat-pivot-wrap', 'del-tat-pivot-label', tatData);
 
   // Detail table
   _delRows = data.rows;
