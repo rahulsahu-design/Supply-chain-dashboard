@@ -601,8 +601,12 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
 def shipment_ageing(df: pd.DataFrame) -> list:
     bucket_order = ["0-5", "6-10", "11-20", "21-30", "30+"]
     d = df[~df["is_delivered"]].copy()
-    counts = d["Ageing Bucket"].str.strip().value_counts().to_dict()
-    return [{"bucket": b, "count": counts.get(b, 0)} for b in bucket_order]
+    result = []
+    for b in bucket_order:
+        bdf = d[d["Ageing Bucket"].str.strip() == b]
+        units = int(bdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in bdf.columns else 0
+        result.append({"bucket": b, "count": len(bdf), "units": units})
+    return result
 
 
 def transporter_scorecard(df: pd.DataFrame) -> list:

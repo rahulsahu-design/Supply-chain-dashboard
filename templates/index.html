@@ -1450,20 +1450,22 @@ function renderAgeingTable(wrapId, rows) {
   if (!wrap) return;
   if (!rows || !rows.length) { wrap.innerHTML = '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>'; return; }
   const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
-  const total = rows.reduce((s, r) => s + r.count, 0);
+  const totalCount = rows.reduce((s, r) => s + r.count, 0);
+  const totalUnits = rows.reduce((s, r) => s + (r.units || 0), 0);
   let html = '<table class="ageing-summary-table"><thead><tr>';
-  html += '<th>Ageing Bucket</th><th>Shipments</th><th>% of Total</th>';
+  html += '<th>Ageing Bucket</th><th>Shipments</th><th>Pending Units</th><th>% Shipments</th>';
   html += '</tr></thead><tbody>';
   rows.forEach(r => {
     const color = BUCKET_COLORS[r.bucket] || '#718096';
-    const pct = total > 0 ? (r.count / total * 100).toFixed(1) : '0.0';
+    const pct = totalCount > 0 ? (r.count / totalCount * 100).toFixed(1) : '0.0';
     html += `<tr>
       <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:8px;vertical-align:middle;"></span><strong>${r.bucket}</strong> days</td>
       <td>${r.count.toLocaleString()}</td>
+      <td><strong>${(r.units || 0).toLocaleString()}</strong></td>
       <td style="color:var(--text-400);">${pct}%</td>
     </tr>`;
   });
-  html += `<tr class="pivot-total-row"><td>Total</td><td>${total.toLocaleString()}</td><td>100%</td></tr>`;
+  html += `<tr class="pivot-total-row"><td>Total</td><td>${totalCount.toLocaleString()}</td><td>${totalUnits.toLocaleString()}</td><td>100%</td></tr>`;
   html += '</tbody></table>';
   wrap.innerHTML = html;
 }
@@ -1506,6 +1508,7 @@ async function loadAgeing() {
     <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
       <div class="kpi-label">${r.bucket} days</div>
       <div class="kpi-value">${fmtNum(r.count)}</div>
+      <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
     </div>
   `).join('');
 }
