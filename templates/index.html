@@ -31,9 +31,7 @@
   <div class="nav-item" data-view="undelivered">
     <span class="nav-icon">🚚</span> Undelivered
   </div>
-  <div class="nav-item" data-view="ageing">
-    <span class="nav-icon">⏳</span> Ageing
-  </div>
+
 
   <div class="sidebar-section-label">Performance</div>
   <div class="nav-item" data-view="scorecard">
@@ -287,6 +285,27 @@
         <div id="undel-sku-wrap"></div>
       </div>
 
+      <!-- Ageing charts -->
+      <div class="chart-row" style="margin-bottom:0;">
+        <div class="card">
+          <h3>Ageing Buckets</h3>
+          <div class="chart-wrap"><canvas id="chart-ageing"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Distribution</h3>
+          <div class="chart-wrap"><canvas id="chart-ageing-pie"></canvas></div>
+        </div>
+      </div>
+      <div class="kpi-grid" id="ageing-kpis" style="margin-bottom:24px;"></div>
+
+      <!-- Ageing pivot -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fee2e2;">
+          <span style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #ef4444;padding-left:10px;">⏳ Pending Units — Transporter × Ageing Bucket</span>
+        </div>
+        <div id="ageing-pivot-wrap" style="overflow-x:auto;"></div>
+      </div>
+
       <!-- Shipment detail (collapsible) -->
       <details>
         <summary class="detail-toggle">▶ Shipment Detail Rows</summary>
@@ -298,35 +317,6 @@
         </div>
       </details>
 
-    </div>
-  </div>
-
-  <!-- ── View: Ageing ──────────────────────────────────────────────────── -->
-  <div class="view" id="view-ageing">
-    <div class="page-header">
-      <div>
-        <h2>Shipment Ageing</h2>
-        <div class="subtitle">Undelivered shipments by age bucket</div>
-      </div>
-    </div>
-    <div class="content-area">
-      <div class="chart-row">
-        <div class="card">
-          <h3>Ageing Buckets</h3>
-          <div class="chart-wrap"><canvas id="chart-ageing"></canvas></div>
-        </div>
-        <div class="card">
-          <h3>Distribution</h3>
-          <div class="chart-wrap"><canvas id="chart-ageing-pie"></canvas></div>
-        </div>
-      </div>
-      <div class="kpi-grid" id="ageing-kpis" style="margin-top:0;"></div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:var(--cream);">
-          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">Pending Units — Transporter × Ageing Bucket</span>
-        </div>
-        <div id="ageing-pivot-wrap" style="overflow-x:auto;"></div>
-      </div>
     </div>
   </div>
 
@@ -496,24 +486,28 @@
         <button class="gf-clear-btn" onclick="clearTsUndelFilters()">✕ Clear</button>
       </div>
 
-      <!-- 2×2 summary grid -->
-      <div class="ts-grid">
-        <div class="card ts-section">
-          <div class="ts-section-title">Delivered Units — Channel × Date</div>
-          <div id="ts-del-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
-        </div>
-        <div class="card ts-section">
-          <div class="ts-section-title">Pending Shipments — Channel × Exp Delivery</div>
-          <div id="ts-undel-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
-        </div>
-        <div class="card ts-section">
-          <div class="ts-section-title">TAT Analysis — Channel × Transporter</div>
-          <div id="ts-tat-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
-        </div>
-        <div class="card ts-section">
-          <div class="ts-section-title">Undelivered Ageing Buckets</div>
-          <div id="ts-ageing"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
-        </div>
+      <!-- Delivered Pivot -->
+      <div class="card ts-section">
+        <div class="ts-section-header ts-header-del">📦 Delivered Units — Channel × Date</div>
+        <div id="ts-del-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
+      </div>
+
+      <!-- TAT Analysis -->
+      <div class="card ts-section">
+        <div class="ts-section-header ts-header-tat">⚡ TAT Analysis — Channel × Transporter</div>
+        <div id="ts-tat-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
+      </div>
+
+      <!-- Pending Shipments Pivot -->
+      <div class="card ts-section">
+        <div class="ts-section-header ts-header-undel">🚚 Pending Shipments — Channel × Exp Delivery</div>
+        <div id="ts-undel-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
+      </div>
+
+      <!-- Ageing -->
+      <div class="card ts-section">
+        <div class="ts-section-header ts-header-ageing">⏳ Undelivered Ageing — Transporter × Bucket</div>
+        <div id="ts-ageing"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
       </div>
 
     </div>
@@ -522,34 +516,55 @@
   <!-- ── Team Summary Modal ─────────────────────────────────────────────── -->
   <div id="ts-modal">
     <div id="ts-modal-inner">
+
+      <!-- Action buttons (hidden on print) -->
+      <div id="ts-modal-btn-row">
+        <button onclick="window.print()" class="btn btn-primary" style="display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
+        <button onclick="closeSummaryModal()" class="gf-clear-btn">✕ Close</button>
+      </div>
+
+      <!-- Brand header -->
       <div id="ts-modal-header">
-        <div>
-          <div id="ts-modal-title">Root Labs · Supply Chain Daily Summary</div>
+        <div id="ts-modal-logo">RL</div>
+        <div id="ts-modal-heading">
+          <div id="ts-modal-title">Root Labs</div>
+          <div id="ts-modal-subtitle">Supply Chain Daily Summary</div>
           <div id="ts-modal-date"></div>
         </div>
-        <div id="ts-modal-btn-row" style="display:flex;gap:10px;">
-          <button onclick="window.print()" class="btn btn-primary" style="display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
-          <button onclick="closeSummaryModal()" class="gf-clear-btn">✕ Close</button>
-        </div>
       </div>
-      <div class="ts-grid">
-        <div class="ts-modal-section">
-          <div class="ts-section-title">Delivered Units</div>
-          <div id="ts-modal-del" style="overflow-x:auto;"></div>
-        </div>
-        <div class="ts-modal-section">
-          <div class="ts-section-title">Pending Shipments</div>
-          <div id="ts-modal-undel" style="overflow-x:auto;"></div>
-        </div>
-        <div class="ts-modal-section">
-          <div class="ts-section-title">TAT Analysis</div>
-          <div id="ts-modal-tat" style="overflow-x:auto;"></div>
-        </div>
-        <div class="ts-modal-section">
-          <div class="ts-section-title">Ageing Buckets</div>
-          <div id="ts-modal-ageing" style="overflow-x:auto;"></div>
-        </div>
+
+      <!-- KPI chips -->
+      <div id="ts-kpi-strip"></div>
+
+      <!-- Deliveries pivot -->
+      <div class="ts-ms ts-ms-del">
+        <div class="ts-ms-header">📦 Deliveries — Channel × Date</div>
+        <div id="ts-modal-del" style="overflow-x:auto;"></div>
       </div>
+
+      <!-- TAT pivot -->
+      <div class="ts-ms ts-ms-tat">
+        <div class="ts-ms-header">⚡ TAT Analysis — Channel × Transporter</div>
+        <div id="ts-modal-tat" style="overflow-x:auto;"></div>
+      </div>
+
+      <!-- Pending pivot -->
+      <div class="ts-ms ts-ms-undel">
+        <div class="ts-ms-header">🚚 Pending Shipments — Channel × Exp Delivery</div>
+        <div id="ts-modal-undel" style="overflow-x:auto;"></div>
+      </div>
+
+      <!-- Ageing pivot -->
+      <div class="ts-ms ts-ms-ageing">
+        <div class="ts-ms-header">⏳ Ageing Analysis — Transporter × Bucket</div>
+        <div id="ts-modal-ageing" style="overflow-x:auto;"></div>
+      </div>
+
+      <!-- Narrative summary -->
+      <div id="ts-modal-summary"></div>
+
+      <div id="ts-modal-footer">Root Labs &middot; Confidential &middot; Generated <span id="ts-modal-gen-time"></span></div>
+
     </div>
   </div>
 
@@ -774,7 +789,6 @@ function loadView(view, force) {
     case 'daily-summary':  return loadSummary();
     case 'delivered':      return loadDelivered();
     case 'undelivered':    return loadUndelivered();
-    case 'ageing':         return loadAgeing();
     case 'scorecard':      return loadScorecard();
     case 'channel-health': return loadChannelHealth();
     case 'trends':         return loadTrends();
@@ -1250,12 +1264,14 @@ async function loadUndelivered() {
   if (to)   pivotExtra.set('to', to);
   if (year && year !== 'All') pivotExtra.set('undel_year', year);
 
-  const [res, pivotRes] = await Promise.all([
+  const [res, pivotRes, ageingRes] = await Promise.all([
     apiFetch('/api/undelivered', extra),
     apiFetch('/api/undelivered-pivot', pivotExtra),
+    apiFetch('/api/ageing', pivotExtra),
   ]);
   const rows      = await res.json();
   const pivotData = await pivotRes.json();
+  const ageingData = await ageingRes.json();
 
   // KPIs
   const byChannel = {};
@@ -1289,6 +1305,32 @@ async function loadUndelivered() {
   buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort', 'undel');
   renderUndelRows();
   renderUndelSku();
+
+  // Ageing charts + KPI cards + pivot (same filters as undelivered)
+  const ageingTotals = ageingData.totals || [];
+  const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
+  const ageLabels = ageingTotals.map(r => r.bucket);
+  const ageCounts = ageingTotals.map(r => r.count);
+  const ageColors = ageingTotals.map(r => BUCKET_COLORS[r.bucket] || '#718096');
+
+  getChart('chart-ageing', 'bar', {
+    labels: ageLabels,
+    datasets: [{ label: 'Shipments', data: ageCounts, backgroundColor: ageColors, borderRadius: 6 }]
+  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
+
+  getChart('chart-ageing-pie', 'doughnut', {
+    labels: ageLabels,
+    datasets: [{ data: ageCounts, backgroundColor: ageColors, borderWidth: 2 }]
+  }, { ...CHART_DEFAULTS });
+
+  document.getElementById('ageing-kpis').innerHTML = ageingTotals.map(r => `
+    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
+      <div class="kpi-label">${r.bucket} days</div>
+      <div class="kpi-value">${fmtNum(r.count)}</div>
+      <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
+    </div>`).join('');
+
+  renderAgeingTable('ageing-pivot-wrap', ageingData);
 }
 
 function clearUndeliveredFilters() {
@@ -1411,41 +1453,7 @@ function renderAgeingTable(wrapId, data) {
   wrap.innerHTML = html;
 }
 
-// ── View 5: Ageing ───────────────────────────────────────────────────────
-async function loadAgeing() {
-  const res = await apiFetch('/api/ageing');
-  const data = await res.json();
-  const totals = data.totals || [];
-
-  const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
-  const labels = totals.map(r => r.bucket);
-  const counts = totals.map(r => r.count);
-  const colors = totals.map(r => BUCKET_COLORS[r.bucket] || '#718096');
-
-  getChart('chart-ageing', 'bar', {
-    labels,
-    datasets: [{ label: 'Shipments', data: counts, backgroundColor: colors, borderRadius: 6 }]
-  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
-
-  getChart('chart-ageing-pie', 'doughnut', {
-    labels,
-    datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2 }]
-  }, { ...CHART_DEFAULTS });
-
-  document.getElementById('ageing-kpis').innerHTML = totals.map(r => `
-    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
-      <div class="kpi-label">${r.bucket} days</div>
-      <div class="kpi-value">${fmtNum(r.count)}</div>
-      <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
-    </div>
-  `).join('');
-
-  // Pivot table below KPIs
-  const ageingPivotWrap = document.getElementById('ageing-pivot-wrap');
-  if (ageingPivotWrap) renderAgeingTable('ageing-pivot-wrap', data);
-}
-
-// ── View 6: Scorecard ────────────────────────────────────────────────────
+// ── View 5: Scorecard ────────────────────────────────────────────────────
 async function loadScorecard() {
   const res = await apiFetch('/api/scorecard');
   const rows = await res.json();
@@ -1704,12 +1712,120 @@ function clearTsUndelFilters() {
 
 function openSummaryModal() {
   if (!_tsDelPivotData) { alert('Load the Team Summary tab first.'); return; }
-  document.getElementById('ts-modal-del').innerHTML   = document.getElementById('ts-del-pivot').innerHTML;
-  document.getElementById('ts-modal-undel').innerHTML = document.getElementById('ts-undel-pivot').innerHTML;
-  document.getElementById('ts-modal-tat').innerHTML   = document.getElementById('ts-tat-pivot').innerHTML;
+
+  // Copy tables
+  document.getElementById('ts-modal-del').innerHTML    = document.getElementById('ts-del-pivot').innerHTML;
+  document.getElementById('ts-modal-tat').innerHTML    = document.getElementById('ts-tat-pivot').innerHTML;
+  document.getElementById('ts-modal-undel').innerHTML  = document.getElementById('ts-undel-pivot').innerHTML;
   document.getElementById('ts-modal-ageing').innerHTML = document.getElementById('ts-ageing').innerHTML;
+
+  // Dates
+  const now = new Date();
   document.getElementById('ts-modal-date').textContent =
-    new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    now.toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('ts-modal-gen-time').textContent =
+    now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+
+  // ── Derive metrics ───────────────────────────────────────────────────────
+  const delUnits = (_tsDelPivotData && _tsDelPivotData.overall_total) || 0;
+
+  const tatOverall = (_tsTATData && _tsTATData.overall) ? _tsTATData.overall : {};
+  const delShipments = tatOverall.count || 0;
+  const avgTAT       = tatOverall.avg_tat != null ? tatOverall.avg_tat : null;
+
+  const undelUnits     = (_tsUndelPivotData && _tsUndelPivotData.overall_total) || 0;
+  const ageingData     = _tsAgeingRows || {};
+  const pendingShipments = ageingData.grand_total_count || 0;
+
+  let overdueUnits = 0;
+  (ageingData.totals || []).forEach(b => {
+    if (b.bucket === '21-30' || b.bucket === '30+') overdueUnits += (b.units || 0);
+  });
+
+  // Top delivering channel
+  let topDelCh = '', topDelChUnits = 0;
+  (_tsDelPivotData && _tsDelPivotData.rows || []).forEach(r => {
+    if ((r.channel_total || 0) > topDelChUnits) { topDelChUnits = r.channel_total; topDelCh = r.channel; }
+  });
+
+  // Top pending channel
+  let topUndelCh = '', topUndelChUnits = 0;
+  (_tsUndelPivotData && _tsUndelPivotData.rows || []).forEach(r => {
+    if ((r.channel_total || 0) > topUndelChUnits) { topUndelChUnits = r.channel_total; topUndelCh = r.channel; }
+  });
+
+  // Most overdue transporter (21-30 + 30+)
+  let worstT = '', worstTUnits = 0;
+  (ageingData.rows || []).forEach(r => {
+    const u = ((r.cells && r.cells['21-30'] ? r.cells['21-30'].units : 0) +
+               (r.cells && r.cells['30+']   ? r.cells['30+'].units   : 0));
+    if (u > worstTUnits) { worstTUnits = u; worstT = r.transporter; }
+  });
+
+  // Period text
+  const fromVal = document.getElementById('ts-from').value;
+  const toVal   = document.getElementById('ts-to').value;
+  const periodText = (fromVal && toVal) ? `${fromVal} to ${toVal}`
+    : fromVal ? `from ${fromVal}` : 'the selected period';
+
+  // ── KPI strip ────────────────────────────────────────────────────────────
+  document.getElementById('ts-kpi-strip').innerHTML = `
+    <div class="ts-kpi-chip chip-green">
+      <div class="ts-kpi-chip-val">${fmtNum(delUnits)}</div>
+      <div class="ts-kpi-chip-label">Units Delivered</div>
+    </div>
+    <div class="ts-kpi-chip chip-blue">
+      <div class="ts-kpi-chip-val">${avgTAT != null ? avgTAT + 'd' : '—'}</div>
+      <div class="ts-kpi-chip-label">Avg TAT</div>
+    </div>
+    <div class="ts-kpi-chip chip-amber">
+      <div class="ts-kpi-chip-val">${fmtNum(undelUnits)}</div>
+      <div class="ts-kpi-chip-label">Pending Units</div>
+    </div>
+    <div class="ts-kpi-chip chip-red">
+      <div class="ts-kpi-chip-val">${fmtNum(overdueUnits)}</div>
+      <div class="ts-kpi-chip-label">Overdue 21d+</div>
+    </div>`;
+
+  // ── Narrative summary ────────────────────────────────────────────────────
+  const tatLine = avgTAT == null ? '' : avgTAT <= 10
+    ? ' TAT performance is on track.'
+    : ' TAT is above target — review transporter SLAs.';
+
+  const overdueLine = overdueUnits > 0
+    ? `<strong>${fmtNum(overdueUnits)} unit${overdueUnits !== 1 ? 's' : ''}</strong> have been aging 21+ days`
+      + (worstT ? ` — <strong>${escHtml(worstT)}</strong> is the most critical transporter (${fmtNum(worstTUnits)} units).` : '.')
+    : 'No critical overdue stock at this time.';
+
+  document.getElementById('ts-modal-summary').innerHTML = `
+    <div class="ts-summary-title">📋 Operational Summary</div>
+    <div class="ts-summary-row">
+      <span class="ts-summary-icon">📦</span>
+      <span class="ts-summary-text">
+        <strong>${fmtNum(delShipments)} shipment${delShipments !== 1 ? 's' : ''}</strong> were delivered during ${escHtml(periodText)},
+        totaling <strong>${fmtNum(delUnits)} units</strong>.
+        ${topDelCh ? `Leading channel: <strong>${escHtml(topDelCh)}</strong> with ${fmtNum(topDelChUnits)} units.` : ''}
+      </span>
+    </div>
+    <div class="ts-summary-row">
+      <span class="ts-summary-icon">⚡</span>
+      <span class="ts-summary-text">
+        Average turnaround time across all channels: <strong>${avgTAT != null ? avgTAT + ' days' : 'N/A'}</strong>.${tatLine}
+      </span>
+    </div>
+    <div class="ts-summary-row">
+      <span class="ts-summary-icon">🚚</span>
+      <span class="ts-summary-text">
+        <strong>${fmtNum(pendingShipments)} shipment${pendingShipments !== 1 ? 's' : ''}</strong> are currently pending delivery,
+        representing <strong>${fmtNum(undelUnits)} units</strong>.
+        ${topUndelCh ? `Highest pending backlog: <strong>${escHtml(topUndelCh)}</strong> (${fmtNum(topUndelChUnits)} units).` : ''}
+      </span>
+    </div>
+    <div class="ts-summary-row">
+      <span class="ts-summary-icon">⚠️</span>
+      <span class="ts-summary-text">${overdueLine}</span>
+    </div>`;
+
   document.getElementById('ts-modal').style.display = 'block';
   document.body.style.overflow = 'hidden';
 }

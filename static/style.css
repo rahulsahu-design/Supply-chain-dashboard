@@ -747,84 +747,212 @@ tbody tr.overdue td { color: var(--accent-red); }
 
 .detail-toggle:hover { color: var(--green-700); }
 
-/* ── Team Summary grid ────────────────────────────────────────────────────── */
-.ts-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
+/* ── Team Summary tab sections ────────────────────────────────────────────── */
 .ts-section {
   padding: 0;
   overflow: hidden;
+  margin-bottom: 16px;
 }
 
-.ts-section-title {
-  padding: 11px 18px;
-  font-size: 10px;
+.ts-section-header {
+  padding: 12px 20px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text-600);
-  text-transform: uppercase;
   letter-spacing: 0.8px;
-  border-bottom: 1px solid var(--border-light);
+  text-transform: uppercase;
   font-family: var(--font-display);
-  background: var(--cream);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
-.ts-section > div:last-child {
-  max-height: 370px;
-  overflow-y: auto;
-  overflow-x: auto;
-}
+.ts-header-del   { background: #d1fae5; color: #065f46; border-left: 4px solid #10b981; }
+.ts-header-tat   { background: #dbeafe; color: #1e40af; border-left: 4px solid #3b82f6; }
+.ts-header-undel { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+.ts-header-ageing{ background: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+
+.ts-section > div:last-child { overflow-x: auto; }
 
 /* ── Summary modal ────────────────────────────────────────────────────────── */
 #ts-modal {
   display: none;
   position: fixed;
   inset: 0;
-  background: #fff;
+  background: #eceae5;
   z-index: 10000;
   overflow-y: auto;
 }
 
 #ts-modal-inner {
-  max-width: 1280px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 28px 32px;
+  padding: 20px 20px 48px;
+}
+
+#ts-modal-btn-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
 
 #ts-modal-header {
+  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 60%, #1b4332 100%);
+  border-radius: 14px;
+  padding: 28px 32px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 3px solid var(--green-800);
-}
-
-#ts-modal-title {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--green-800);
-}
-
-#ts-modal-date {
-  font-size: 12px;
-  color: var(--text-400);
-  margin-top: 4px;
-}
-
-.ts-modal-section {
-  background: var(--card-bg);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  gap: 22px;
+  margin-bottom: 16px;
+  position: relative;
   overflow: hidden;
 }
 
-.ts-modal-section > div:last-child {
-  overflow-x: auto;
+#ts-modal-header::before {
+  content: '';
+  position: absolute;
+  right: -50px; top: -50px;
+  width: 220px; height: 220px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 50%;
+}
+
+#ts-modal-header::after {
+  content: '';
+  position: absolute;
+  right: 80px; bottom: -70px;
+  width: 180px; height: 180px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 50%;
+}
+
+#ts-modal-logo {
+  width: 58px; height: 58px;
+  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.25);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 800;
+  color: #fff; flex-shrink: 0;
+  letter-spacing: 1px; position: relative; z-index: 1;
+}
+
+#ts-modal-heading { color: #fff; position: relative; z-index: 1; }
+
+#ts-modal-title {
+  font-family: var(--font-display);
+  font-size: 26px; font-weight: 800;
+  color: #fff; line-height: 1.15;
+}
+
+#ts-modal-subtitle {
+  font-size: 13px; color: rgba(255,255,255,0.72);
+  margin-top: 3px; font-weight: 500;
+}
+
+#ts-modal-date {
+  font-size: 11.5px; color: rgba(255,255,255,0.55); margin-top: 5px;
+}
+
+/* KPI strip */
+#ts-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ts-kpi-chip {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 14px;
+  text-align: center;
+  border-top: 3px solid;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.08);
+}
+
+.ts-kpi-chip.chip-green  { border-color: #10b981; }
+.ts-kpi-chip.chip-blue   { border-color: #3b82f6; }
+.ts-kpi-chip.chip-amber  { border-color: #f59e0b; }
+.ts-kpi-chip.chip-red    { border-color: #ef4444; }
+
+.ts-kpi-chip-val {
+  font-family: var(--font-display);
+  font-size: 28px; font-weight: 800;
+  line-height: 1; margin-bottom: 4px;
+}
+
+.chip-green  .ts-kpi-chip-val { color: #059669; }
+.chip-blue   .ts-kpi-chip-val { color: #2563eb; }
+.chip-amber  .ts-kpi-chip-val { color: #d97706; }
+.chip-red    .ts-kpi-chip-val { color: #dc2626; }
+
+.ts-kpi-chip-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.7px;
+  color: #6b7280; font-family: var(--font-display); line-height: 1.3;
+}
+
+/* Modal section cards */
+.ts-ms {
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+}
+
+.ts-ms > div:last-child { overflow-x: auto; }
+
+.ts-ms-header {
+  padding: 13px 20px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  font-family: var(--font-display);
+}
+
+.ts-ms-del    .ts-ms-header { background: #d1fae5; color: #065f46; border-left: 4px solid #10b981; }
+.ts-ms-tat    .ts-ms-header { background: #dbeafe; color: #1e40af; border-left: 4px solid #3b82f6; }
+.ts-ms-undel  .ts-ms-header { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+.ts-ms-ageing .ts-ms-header { background: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+
+/* Operational summary */
+#ts-modal-summary {
+  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+  border-radius: 10px;
+  padding: 22px 26px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+}
+
+.ts-summary-title {
+  font-family: var(--font-display);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.9px;
+  color: rgba(255,255,255,0.6); margin-bottom: 14px;
+}
+
+.ts-summary-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.ts-summary-row:last-child { border-bottom: none; }
+
+.ts-summary-icon {
+  font-size: 17px; flex-shrink: 0;
+  width: 22px; text-align: center;
+}
+
+.ts-summary-text {
+  font-size: 13px; line-height: 1.6;
+  color: rgba(255,255,255,0.88); flex: 1;
+}
+
+.ts-summary-text strong { color: #fff; font-weight: 700; }
+
+#ts-modal-footer {
+  text-align: center; font-size: 10px; color: #9ca3af;
+  font-family: var(--font-display); letter-spacing: 0.5px; padding-top: 6px;
 }
 
 /* ── SKU summary table ────────────────────────────────────────────────────── */
@@ -902,7 +1030,7 @@ tbody tr.overdue td { color: var(--accent-red); }
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .chart-row { grid-template-columns: 1fr; }
-  .ts-grid { grid-template-columns: 1fr; }
+  #ts-kpi-strip { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ── Print (for Generate Summary modal) ──────────────────────────────────── */
@@ -914,21 +1042,26 @@ tbody tr.overdue td { color: var(--accent-red); }
     display: block !important;
     position: static !important;
     overflow: visible !important;
+    background: #fff !important;
   }
   #ts-modal-btn-row { display: none !important; }
-  .ts-grid { page-break-inside: avoid; }
-  .pivot-table thead th,
-  .pivot-ch-row td,
-  .sku-table thead th,
-  .ageing-summary-table thead th {
+  #ts-modal-inner { padding: 12px 16px 24px; }
+  #ts-modal-header, #ts-kpi-strip, #ts-modal-summary {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .pivot-total-row td,
-  .sku-total-row td {
-    background: var(--green-800) !important;
-    color: #fff !important;
+  .ts-ms-header,
+  .ts-ms-del .ts-ms-header, .ts-ms-tat .ts-ms-header,
+  .ts-ms-undel .ts-ms-header, .ts-ms-ageing .ts-ms-header {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  .pivot-table thead th, .pivot-total-row td,
+  .sku-table thead th, .sku-total-row td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .ts-ms { box-shadow: none; border: 1px solid #e5e7eb; page-break-inside: avoid; }
+  #ts-kpi-strip { grid-template-columns: repeat(4, 1fr); }
+  .ts-kpi-chip { box-shadow: none; border: 1px solid #e5e7eb; }
 }
