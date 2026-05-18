@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import os
 import base64
 import json
+import threading
 
 SHEET_ID = "1ixmX8rsx9jiGzvSgG8dwXAdQGINGYMprJexgiV4MOwk"
 TAB_NAME = "Shipment Tracker AWB wise"
@@ -24,14 +25,21 @@ PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
 PROM_TAT_DEFAULT = 12
 
 _cache = {"df": None, "fetched_at": None}
-CACHE_TTL_SECONDS = 300
+CACHE_TTL_SECONDS = 600  # 10 minutes
+
+# Cached worksheet — avoids re-authenticating + re-opening the sheet every refresh
+_ws_cache = {"sheet": None, "last_connect": None}
+WS_CACHE_TTL_SECONDS = 3600  # reconnect once per hour
+
+# Prevents concurrent fetches
+_fetch_lock = threading.Lock()
 
 
 def _connect():
     b64 = os.environ.get("GOOGLE_CREDS_B64")
     if b64:
         try:
-            b64 = "".join(b64.split())  # remove ALL whitespace including internal newlines
+            b64 = "".join(b64.split())
             padded = b64 + "=" * (-len(b64) % 4)
             decoded = base64.b64decode(padded).decode("utf-8")
             info = json.loads(decoded)
@@ -43,61 +51,62 @@ def _connect():
     return gspread.authorize(creds)
 
 
-def fetch_data(force=False) -> pd.DataFrame:
+def _get_worksheet():
+    """Return a cached gspread worksheet, reconnecting only if stale or on error."""
     now = datetime.now()
-    if (
-        not force
-        and _cache["df"] is not None
-        and _cache["fetched_at"]
-        and (now - _cache["fetched_at"]).seconds < CACHE_TTL_SECONDS
-    ):
-        return _cache["df"]
+    ws = _ws_cache["sheet"]
+    last = _ws_cache["last_connect"]
+    if ws is None or last is None or (now - last).total_seconds() > WS_CACHE_TTL_SECONDS:
+        client = _connect()
+        ws = client.open_by_key(SHEET_ID).worksheet(TAB_NAME)
+        _ws_cache["sheet"] = ws
+        _ws_cache["last_connect"] = now
+    return ws
 
-    client = _connect()
-    sheet = client.open_by_key(SHEET_ID).worksheet(TAB_NAME)
-    raw = sheet.get_all_values()
+
+def _do_fetch():
+    """Fetch from Google Sheets and update the in-memory cache. Not thread-safe alone."""
+    try:
+        ws = _get_worksheet()
+        raw = ws.get_all_values()
+    except Exception:
+        # Stale connection — force reconnect and retry once
+        _ws_cache["sheet"] = None
+        ws = _get_worksheet()
+        raw = ws.get_all_values()
 
     if not raw:
-        return pd.DataFrame()
+        return
 
-    # Row 4 (index 3) is the header row; data starts at row 5 (index 4)
     HEADER_ROW_IDX = 3
     headers = [h.strip() for h in raw[HEADER_ROW_IDX]]
     data_rows = raw[HEADER_ROW_IDX + 1:]
 
-    # Pad short rows to match header length
     n = len(headers)
     data_rows = [row + [''] * (n - len(row)) if len(row) < n else row[:n] for row in data_rows]
 
     df = pd.DataFrame(data_rows, columns=headers)
-
-    # Drop columns with empty headers (trailing blank columns)
     df = df.loc[:, df.columns != '']
 
-    # Parse date columns — let pandas infer format (handles DD/MM/YYYY, DD-MM-YYYY, ISO, etc.)
     date_cols = ["Pick up Date", "Actual Delivery Date", "Expected Delivery Date"]
     for col in date_cols:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
 
-    # Numeric coercions
     for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Fill missing Prom TAT with transporter-specific defaults
     if "Prom TAT" in df.columns and "Transporter" in df.columns:
         prom_null = df["Prom TAT"].isna()
         if prom_null.any():
             for t, tat in PROM_TAT_BY_TRANSPORTER.items():
                 df.loc[prom_null & (df["Transporter"].str.strip() == t), "Prom TAT"] = tat
             df.loc[prom_null & df["Prom TAT"].isna(), "Prom TAT"] = PROM_TAT_DEFAULT
-            # Recalculate Delay Days for rows where Prom TAT was previously missing
             if "Actual TAT" in df.columns and "Delay Days" in df.columns:
                 recalc = prom_null & df["Actual TAT"].notna()
                 df.loc[recalc, "Delay Days"] = df.loc[recalc, "Actual TAT"] - df.loc[recalc, "Prom TAT"]
 
-    # Drop 2024 and earlier — keep Jan 2025 onwards for performance
     if "Year" in df.columns:
         year_num = pd.to_numeric(
             df["Year"].astype(str).str.strip().str.replace(',', '', regex=False),
@@ -105,10 +114,8 @@ def fetch_data(force=False) -> pd.DataFrame:
         )
         df = df[year_num.isna() | (year_num >= 2025)].copy()
 
-    # Derived flags
     df["is_delivered"] = df[STATUS_COL].str.strip().isin(DELIVERED_STATUSES)
 
-    # is_overdue: Xindus = ageing > 40 days, all others = ageing bucket 21+
     if "Transporter" in df.columns and "Ageing" in df.columns:
         xindus = df["Transporter"].str.strip() == XINDUS
         df["is_overdue"] = (
@@ -119,8 +126,49 @@ def fetch_data(force=False) -> pd.DataFrame:
         df["is_overdue"] = df["Ageing Bucket"].str.strip().isin(OVERDUE_BUCKETS)
 
     _cache["df"] = df
-    _cache["fetched_at"] = now
-    return df
+    _cache["fetched_at"] = datetime.now()
+
+
+def fetch_data(force=False) -> pd.DataFrame:
+    now = datetime.now()
+    is_stale = (
+        _cache["df"] is None
+        or _cache["fetched_at"] is None
+        or (now - _cache["fetched_at"]).total_seconds() >= CACHE_TTL_SECONDS
+    )
+
+    # Stale but data exists: serve immediately and refresh in background
+    if not force and _cache["df"] is not None and is_stale:
+        if _fetch_lock.acquire(blocking=False):
+            def _bg():
+                try:
+                    _do_fetch()
+                finally:
+                    _fetch_lock.release()
+            threading.Thread(target=_bg, daemon=True).start()
+        return _cache["df"]
+
+    # Cold start or explicit force: must block until data is ready
+    if _cache["df"] is None or force:
+        with _fetch_lock:
+            # Re-check under lock — another thread may have just fetched
+            now2 = datetime.now()
+            needs = (
+                force
+                or _cache["df"] is None
+                or _cache["fetched_at"] is None
+                or (now2 - _cache["fetched_at"]).total_seconds() >= CACHE_TTL_SECONDS
+            )
+            if needs:
+                if force:
+                    _ws_cache["sheet"] = None  # force fresh connection too
+                _do_fetch()
+
+    return _cache["df"]
+
+
+# Pre-warm the cache as soon as the module loads so the first request is instant
+threading.Thread(target=fetch_data, daemon=True).start()
 
 
 # ── Global filter helpers ─────────────────────────────────────────────────────

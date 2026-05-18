@@ -610,12 +610,31 @@ function clearFilters() {
 let _forceRefresh = false;
 let _maxDeliveryDate = null;
 
-function apiFetch(path, extraParams) {
+// Client-side API response cache — avoids redundant server calls within a session
+const _apiCache = new Map();
+const API_CACHE_TTL_MS = 4 * 60 * 1000; // 4 minutes
+
+async function apiFetch(path, extraParams) {
   const p = getFilterParams();
   if (extraParams) extraParams.forEach((v, k) => p.set(k, v));
-  if (_forceRefresh) p.set('refresh', '1');
+  if (_forceRefresh) {
+    p.set('refresh', '1');
+    _apiCache.clear(); // force refresh blows the entire client cache
+  }
   const sep = path.includes('?') ? '&' : '?';
-  return fetch(path + (p.toString() ? sep + p.toString() : ''));
+  const url = path + (p.toString() ? sep + p.toString() : '');
+
+  if (!_forceRefresh) {
+    const hit = _apiCache.get(url);
+    if (hit && Date.now() - hit.ts < API_CACHE_TTL_MS) {
+      return { json: async () => hit.data };
+    }
+  }
+
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!_forceRefresh) _apiCache.set(url, { data, ts: Date.now() });
+  return { json: async () => data };
 }
 
 async function loadFilterOptions() {
@@ -1701,7 +1720,8 @@ function closeSummaryModal() {
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
-loadFilterOptions().then(() => loadView('daily-summary'));
+// Fire filter-options and the default view in parallel — neither depends on the other completing first
+Promise.all([loadFilterOptions(), loadView('daily-summary')]);
 document.getElementById('last-updated').textContent = 'Loaded ' + new Date().toLocaleTimeString();
 </script>
 
