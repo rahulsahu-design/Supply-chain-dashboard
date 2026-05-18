@@ -118,7 +118,16 @@ def api_tat_pivot():
 
 @app.route("/api/ageing")
 def api_ageing():
-    return jsonify(d.shipment_ageing(_filtered_df()))
+    df = _filtered_df()
+    channels_raw = request.args.get("channels", "All")
+    exp_del_weeks_raw = request.args.get("exp_del_weeks", "All")
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    year = request.args.get("undel_year")
+    channels = [c.strip() for c in channels_raw.split(",")] if channels_raw and channels_raw != "All" else None
+    exp_del_weeks = [w.strip() for w in exp_del_weeks_raw.split(",")] if exp_del_weeks_raw and exp_del_weeks_raw != "All" else None
+    return jsonify(d.shipment_ageing(df, channels=channels, exp_del_weeks=exp_del_weeks,
+                                     date_from=date_from, date_to=date_to, year=year))
 
 
 @app.route("/api/scorecard")

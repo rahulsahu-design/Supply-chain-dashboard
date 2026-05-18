@@ -1758,7 +1758,7 @@ async function loadTeamSummary() {
     apiFetch('/api/delivered-pivot', delExtra),
     apiFetch('/api/undelivered-pivot', undelExtra),
     apiFetch('/api/tat-pivot', tatExtra),
-    apiFetch('/api/ageing'),
+    apiFetch('/api/ageing', undelExtra),
   ]);
 
   _tsDelPivotData   = await delRes.json();

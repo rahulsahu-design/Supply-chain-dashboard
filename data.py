@@ -598,11 +598,25 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
     return grouped.to_dict(orient="records")
 
 
-def shipment_ageing(df: pd.DataFrame) -> dict:
+def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
+                    date_from=None, date_to=None, year=None) -> dict:
     bucket_order = ["0-5", "6-10", "11-20", "21-30", "30+"]
     _EXCLUDE = {"Delivered", "RTO", "Abandon", "RTS"}
     status = df[STATUS_COL].str.strip()
     d = df[status.notna() & (status != "") & ~status.isin(_EXCLUDE)].copy()
+    d = _filter_channel(d, channels)
+    d = _filter_exp_del_week(d, exp_del_weeks)
+    if year and year != "All":
+        try:
+            target = int(float(str(year).strip()))
+            if "Expected Delivery Date" in d.columns:
+                d = d[d["Expected Delivery Date"].dt.year == target]
+        except (ValueError, TypeError):
+            pass
+    if date_from and "Expected Delivery Date" in d.columns:
+        d = d[d["Expected Delivery Date"].dt.date >= pd.to_datetime(date_from).date()]
+    if date_to and "Expected Delivery Date" in d.columns:
+        d = d[d["Expected Delivery Date"].dt.date <= pd.to_datetime(date_to).date()]
 
     def _units(sub):
         return int(sub["Qty Sent"].fillna(0).sum()) if "Qty Sent" in sub.columns else 0
