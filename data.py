@@ -600,7 +600,9 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
 
 def shipment_ageing(df: pd.DataFrame) -> dict:
     bucket_order = ["0-5", "6-10", "11-20", "21-30", "30+"]
-    d = df[~df["is_delivered"]].copy()
+    _EXCLUDE = {"Delivered", "RTO", "Abandon", "RTS"}
+    status = df[STATUS_COL].str.strip()
+    d = df[status.notna() & (status != "") & ~status.isin(_EXCLUDE)].copy()
 
     def _units(sub):
         return int(sub["Qty Sent"].fillna(0).sum()) if "Qty Sent" in sub.columns else 0
