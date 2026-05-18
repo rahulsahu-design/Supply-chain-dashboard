@@ -492,8 +492,10 @@
     </div>
     <div class="content-area">
 
-      <!-- Filter bar -->
-      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      <!-- Filter row 1: Delivered & TAT -->
+      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--green-800);font-family:var(--font-display);white-space:nowrap;">✅ Delivered &amp; TAT</span>
+        <div class="gf-divider"></div>
         <label>Channel</label>
         <div class="ms-dropdown" id="ms-ts-channel" data-all-label="All Channels">
           <button class="ms-trigger" type="button" onclick="toggleMs('ms-ts-channel')">
@@ -520,6 +522,41 @@
         <input type="date" id="ts-to">
         <button class="btn btn-primary" onclick="loadTeamSummary()">Apply</button>
         <button class="gf-clear-btn" onclick="clearTeamSummaryFilters()">✕ Clear</button>
+      </div>
+
+      <!-- Filter row 2: Pending & Ageing -->
+      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--accent-blue);font-family:var(--font-display);white-space:nowrap;">🚚 Pending &amp; Ageing</span>
+        <div class="gf-divider"></div>
+        <label>Channel</label>
+        <div class="ms-dropdown" id="ms-ts-undel-channel" data-all-label="All Channels">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-ts-undel-channel')">
+            <span class="ms-label">All Channels</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-ts-undel-channel',this)" checked> All</label>
+            <label class="ms-option"><input type="checkbox" value="Amazon" onchange="msItemToggle('ms-ts-undel-channel',this)"> Amazon</label>
+            <label class="ms-option"><input type="checkbox" value="TikTok" onchange="msItemToggle('ms-ts-undel-channel',this)"> TikTok</label>
+            <label class="ms-option"><input type="checkbox" value="Shipbob" onchange="msItemToggle('ms-ts-undel-channel',this)"> Shipbob</label>
+          </div>
+        </div>
+        <label>Year</label>
+        <select id="ts-undel-year"><option value="All">All Years</option></select>
+        <label>Exp Del Week</label>
+        <div class="ms-dropdown" id="ms-ts-undel-week" data-all-label="All Weeks">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-ts-undel-week')">
+            <span class="ms-label">All Weeks</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel" id="ms-ts-undel-week-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-ts-undel-week',this)" checked> All</label>
+          </div>
+        </div>
+        <label>Exp Del From</label>
+        <input type="date" id="ts-undel-from">
+        <label>To</label>
+        <input type="date" id="ts-undel-to">
+        <button class="btn btn-primary" onclick="loadTeamSummary()">Apply</button>
+        <button class="gf-clear-btn" onclick="clearTsUndelFilters()">✕ Clear</button>
       </div>
 
       <!-- 2×2 summary grid -->
@@ -689,6 +726,16 @@ async function loadFilterOptions() {
   const tatDelWeekPanel = document.getElementById('ms-tat-del-week-panel');
   (opts.del_weeks || []).forEach(w => {
     tatDelWeekPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-tat-del-week',this)"> W${w}</label>`;
+  });
+
+  // Populate Team Summary undel filters
+  const tsUndelYearSel = document.getElementById('ts-undel-year');
+  (opts.exp_del_years || []).forEach(y => {
+    const o = document.createElement('option'); o.value = o.textContent = y; tsUndelYearSel.appendChild(o);
+  });
+  const tsUndelWeekPanel = document.getElementById('ms-ts-undel-week-panel');
+  (opts.exp_del_weeks || []).forEach(w => {
+    tsUndelWeekPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-ts-undel-week',this)"> W${w}</label>`;
   });
 }
 
@@ -1640,6 +1687,13 @@ async function loadTeamSummary() {
   const channels = getMsValues('ms-ts-channel');
   const from = fromEl.value, to = toEl.value;
 
+  // Row 2 filter values (Pending & Ageing)
+  const undelChannels  = getMsValues('ms-ts-undel-channel');
+  const undelExpWeeks  = getMsValues('ms-ts-undel-week');
+  const undelYear      = document.getElementById('ts-undel-year').value;
+  const undelFrom      = document.getElementById('ts-undel-from').value;
+  const undelTo        = document.getElementById('ts-undel-to').value;
+
   ['ts-del-pivot','ts-undel-pivot','ts-tat-pivot','ts-ageing'].forEach(id => {
     document.getElementById(id).innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
   });
@@ -1650,7 +1704,11 @@ async function loadTeamSummary() {
   if (to)   delExtra.set('to', to);
 
   const undelExtra = new URLSearchParams();
-  if (channels.length) undelExtra.set('channels', channels.join(','));
+  if (undelChannels.length)  undelExtra.set('channels',    undelChannels.join(','));
+  if (undelExpWeeks.length)  undelExtra.set('exp_del_weeks', undelExpWeeks.join(','));
+  if (undelYear && undelYear !== 'All') undelExtra.set('undel_year', undelYear);
+  if (undelFrom) undelExtra.set('from', undelFrom);
+  if (undelTo)   undelExtra.set('to',   undelTo);
 
   const tatExtra = new URLSearchParams();
   if (channels.length) tatExtra.set('channels', channels.join(','));
@@ -1692,6 +1750,20 @@ function clearTeamSummaryFilters() {
   from.setDate(today.getDate() - 6);
   document.getElementById('ts-from').value = from.toISOString().split('T')[0];
   document.getElementById('ts-to').value   = today.toISOString().split('T')[0];
+  loadTeamSummary();
+}
+
+function clearTsUndelFilters() {
+  ['ms-ts-undel-channel', 'ms-ts-undel-week'].forEach(id => {
+    const el = document.getElementById(id);
+    el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    const allCb = el.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel(id);
+  });
+  document.getElementById('ts-undel-year').value = 'All';
+  document.getElementById('ts-undel-from').value = '';
+  document.getElementById('ts-undel-to').value   = '';
   loadTeamSummary();
 }
 
