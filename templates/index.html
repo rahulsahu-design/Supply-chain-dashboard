@@ -36,9 +36,6 @@
   </div>
 
   <div class="sidebar-section-label">Performance</div>
-  <div class="nav-item" data-view="tat">
-    <span class="nav-icon">⚡</span> TAT Analysis
-  </div>
   <div class="nav-item" data-view="scorecard">
     <span class="nav-icon">🏆</span> Transporter Scorecard
   </div>
@@ -300,74 +297,6 @@
           </table>
         </div>
       </details>
-
-    </div>
-  </div>
-
-  <!-- ── View: TAT Analysis ───────────────────────────────────────────── -->
-  <div class="view" id="view-tat">
-    <div class="page-header">
-      <div>
-        <h2>TAT Analysis</h2>
-        <div class="subtitle">Delivered shipments — Channel × Transporter breakdown</div>
-      </div>
-    </div>
-    <div class="content-area">
-
-      <!-- Filter bar -->
-      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
-        <label>Channel</label>
-        <div class="ms-dropdown" id="ms-tat-channel" data-all-label="All Channels">
-          <button class="ms-trigger" type="button" onclick="toggleMs('ms-tat-channel')">
-            <span class="ms-label">All Channels</span><span class="ms-caret">▾</span>
-          </button>
-          <div class="ms-panel">
-            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-tat-channel',this)" checked> All</label>
-            <label class="ms-option"><input type="checkbox" value="Amazon" onchange="msItemToggle('ms-tat-channel',this)"> Amazon</label>
-            <label class="ms-option"><input type="checkbox" value="TikTok" onchange="msItemToggle('ms-tat-channel',this)"> TikTok</label>
-            <label class="ms-option"><input type="checkbox" value="Shipbob" onchange="msItemToggle('ms-tat-channel',this)"> Shipbob</label>
-          </div>
-        </div>
-
-        <label>Del Week</label>
-        <div class="ms-dropdown" id="ms-tat-del-week" data-all-label="All Weeks">
-          <button class="ms-trigger" type="button" onclick="toggleMs('ms-tat-del-week')">
-            <span class="ms-label">All Weeks</span><span class="ms-caret">▾</span>
-          </button>
-          <div class="ms-panel" id="ms-tat-del-week-panel">
-            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-tat-del-week',this)" checked> All</label>
-          </div>
-        </div>
-
-        <label>Period</label>
-        <select id="tat-period" onchange="applyPeriod(this,'tat-from','tat-to',loadTAT)">
-          <option value="">All</option>
-          <option value="7">Last 7 days</option>
-          <option value="14">Last 14 days</option>
-          <option value="30">Last 30 days</option>
-          <option value="60">Last 60 days</option>
-        </select>
-        <label>Delivery From</label>
-        <input type="date" id="tat-from">
-        <label>To</label>
-        <input type="date" id="tat-to">
-        <button class="btn btn-primary" onclick="loadTAT()">Apply</button>
-        <button class="gf-clear-btn" onclick="clearTATFilters()">&#x2715; Clear</button>
-      </div>
-
-      <!-- KPIs -->
-      <div class="kpi-grid" id="tat-kpis" style="margin-bottom:24px;"></div>
-
-      <!-- Pivot table -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid var(--border-light);">
-          <span style="font-size:12px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.5px;">Deliveries &amp; Avg TAT — Channel × Transporter</span>
-          <span id="tat-pivot-label" style="font-size:11px;color:var(--text-400);"></span>
-        </div>
-        <div id="tat-pivot-wrap" style="overflow-x:auto;">
-          <div class="loading-state"><div class="spinner"></div> Loading…</div>
-        </div>
-      </div>
 
     </div>
   </div>
@@ -730,11 +659,6 @@ async function loadFilterOptions() {
     const o = document.createElement('option'); o.value = o.textContent = y; delYearSel.appendChild(o);
   });
 
-  // Populate TAT del-week multi-select
-  const tatDelWeekPanel = document.getElementById('ms-tat-del-week-panel');
-  (opts.del_weeks || []).forEach(w => {
-    tatDelWeekPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-tat-del-week',this)"> W${w}</label>`;
-  });
 
   // Populate Team Summary undel filters
   const tsUndelYearSel = document.getElementById('ts-undel-year');
@@ -831,7 +755,6 @@ function loadView(view, force) {
     case 'daily-summary':  return loadSummary();
     case 'delivered':      return loadDelivered();
     case 'undelivered':    return loadUndelivered();
-    case 'tat':            return loadTAT();
     case 'ageing':         return loadAgeing();
     case 'scorecard':      return loadScorecard();
     case 'channel-health': return loadChannelHealth();
@@ -1363,36 +1286,6 @@ function clearUndeliveredFilters() {
   loadUndelivered();
 }
 
-// ── View 4: TAT Analysis ─────────────────────────────────────────────────
-async function loadTAT() {
-  const channels = getMsValues('ms-tat-channel');
-  const delWeeks = getMsValues('ms-tat-del-week');
-  const from = document.getElementById('tat-from').value;
-  const to   = document.getElementById('tat-to').value;
-
-  const extra = new URLSearchParams();
-  if (channels.length) extra.set('channels', channels.join(','));
-  if (delWeeks.length) extra.set('del_weeks', delWeeks.join(','));
-  if (from) extra.set('from', from);
-  if (to)   extra.set('to', to);
-
-  const res = await apiFetch('/api/tat-pivot', extra);
-  const data = await res.json();
-
-  // KPIs
-  document.getElementById('tat-kpis').innerHTML = `
-    <div class="kpi-card accent-green">
-      <div class="kpi-label">Total Deliveries</div>
-      <div class="kpi-value">${fmtNum(data.overall.count)}</div>
-    </div>
-    <div class="kpi-card accent-blue">
-      <div class="kpi-label">Overall Avg TAT</div>
-      <div class="kpi-value">${fmtFloat(data.overall.avg_tat)}<span style="font-size:16px;font-weight:600;margin-left:4px;">days</span></div>
-    </div>
-  `;
-
-  renderTATPivot(data);
-}
 
 function renderTATPivotTo(wrapId, labelId, data) {
   const wrap = document.getElementById(wrapId);
@@ -1456,8 +1349,6 @@ function renderTATPivotTo(wrapId, labelId, data) {
   wrap.innerHTML = html;
 }
 
-function renderTATPivot(data) { renderTATPivotTo('tat-pivot-wrap', 'tat-pivot-label', data); }
-
 function renderAgeingTable(wrapId, data) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
@@ -1499,20 +1390,6 @@ function renderAgeingTable(wrapId, data) {
 
   html += '</tbody></table>';
   wrap.innerHTML = html;
-}
-
-function clearTATFilters() {
-  ['ms-tat-channel', 'ms-tat-del-week'].forEach(id => {
-    const el = document.getElementById(id);
-    el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-    const allCb = el.querySelector('input[value="__all__"]');
-    if (allCb) allCb.checked = true;
-    updateMsLabel(id);
-  });
-  document.getElementById('tat-period').value = '';
-  document.getElementById('tat-from').value = '';
-  document.getElementById('tat-to').value = '';
-  loadTAT();
 }
 
 // ── View 5: Ageing ───────────────────────────────────────────────────────
