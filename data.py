@@ -598,15 +598,44 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
     return grouped.to_dict(orient="records")
 
 
-def shipment_ageing(df: pd.DataFrame) -> list:
+def shipment_ageing(df: pd.DataFrame) -> dict:
     bucket_order = ["0-5", "6-10", "11-20", "21-30", "30+"]
     d = df[~df["is_delivered"]].copy()
-    result = []
+
+    def _units(sub):
+        return int(sub["Qty Sent"].fillna(0).sum()) if "Qty Sent" in sub.columns else 0
+
+    # Bucket totals (for charts / KPI cards)
+    bucket_totals = []
     for b in bucket_order:
         bdf = d[d["Ageing Bucket"].str.strip() == b]
-        units = int(bdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in bdf.columns else 0
-        result.append({"bucket": b, "count": len(bdf), "units": units})
-    return result
+        bucket_totals.append({"bucket": b, "count": len(bdf), "units": _units(bdf)})
+
+    # Transporter × bucket pivot
+    transporters = sorted(
+        d["Transporter"].dropna().str.strip().replace("", pd.NA).dropna().unique().tolist()
+    )
+    pivot_rows = []
+    for t in transporters:
+        tdf = d[d["Transporter"].str.strip() == t]
+        cells = {}
+        for b in bucket_order:
+            bdf = tdf[tdf["Ageing Bucket"].str.strip() == b]
+            cells[b] = {"count": len(bdf), "units": _units(bdf)}
+        pivot_rows.append({
+            "transporter": t,
+            "cells": cells,
+            "total_count": len(tdf),
+            "total_units": _units(tdf),
+        })
+
+    return {
+        "buckets": bucket_order,
+        "rows": pivot_rows,
+        "totals": bucket_totals,
+        "grand_total_count": len(d),
+        "grand_total_units": _units(d),
+    }
 
 
 def transporter_scorecard(df: pd.DataFrame) -> list:

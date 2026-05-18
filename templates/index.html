@@ -390,6 +390,12 @@
         </div>
       </div>
       <div class="kpi-grid" id="ageing-kpis" style="margin-top:0;"></div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:var(--cream);">
+          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">Pending Units — Transporter × Ageing Bucket</span>
+        </div>
+        <div id="ageing-pivot-wrap" style="overflow-x:auto;"></div>
+      </div>
     </div>
   </div>
 
@@ -1445,27 +1451,45 @@ function renderTATPivotTo(wrapId, labelId, data) {
 
 function renderTATPivot(data) { renderTATPivotTo('tat-pivot-wrap', 'tat-pivot-label', data); }
 
-function renderAgeingTable(wrapId, rows) {
+function renderAgeingTable(wrapId, data) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
-  if (!rows || !rows.length) { wrap.innerHTML = '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>'; return; }
+  const buckets  = data.buckets  || [];
+  const pivotRows = data.rows    || [];
+  const totals   = data.totals   || [];
+  if (!buckets.length) { wrap.innerHTML = '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>'; return; }
+
   const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
-  const totalCount = rows.reduce((s, r) => s + r.count, 0);
-  const totalUnits = rows.reduce((s, r) => s + (r.units || 0), 0);
-  let html = '<table class="ageing-summary-table"><thead><tr>';
-  html += '<th>Ageing Bucket</th><th>Shipments</th><th>Pending Units</th><th>% Shipments</th>';
-  html += '</tr></thead><tbody>';
-  rows.forEach(r => {
-    const color = BUCKET_COLORS[r.bucket] || '#718096';
-    const pct = totalCount > 0 ? (r.count / totalCount * 100).toFixed(1) : '0.0';
-    html += `<tr>
-      <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:8px;vertical-align:middle;"></span><strong>${r.bucket}</strong> days</td>
-      <td>${r.count.toLocaleString()}</td>
-      <td><strong>${(r.units || 0).toLocaleString()}</strong></td>
-      <td style="color:var(--text-400);">${pct}%</td>
-    </tr>`;
+
+  let html = '<table class="pivot-table"><thead><tr>';
+  html += '<th style="text-align:left;min-width:160px;">Transporter</th>';
+  buckets.forEach(b => {
+    const color = BUCKET_COLORS[b] || '#718096';
+    html += `<th style="text-align:center;min-width:80px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;vertical-align:middle;"></span>${b}d</th>`;
   });
-  html += `<tr class="pivot-total-row"><td>Total</td><td>${totalCount.toLocaleString()}</td><td>${totalUnits.toLocaleString()}</td><td>100%</td></tr>`;
+  html += '<th class="pivot-col-total" style="text-align:center;">Total Units</th>';
+  html += '</tr></thead><tbody>';
+
+  pivotRows.forEach(row => {
+    html += `<tr class="pivot-ch-row"><td><strong>${escHtml(row.transporter)}</strong></td>`;
+    buckets.forEach(b => {
+      const u = row.cells[b] ? row.cells[b].units : 0;
+      html += `<td style="text-align:center;font-size:13px;">${u > 0 ? `<strong>${u.toLocaleString()}</strong>` : '<span style="color:var(--text-300);">—</span>'}</td>`;
+    });
+    html += `<td class="pivot-col-total" style="text-align:center;font-weight:800;">${row.total_units.toLocaleString()}</td>`;
+    html += '</tr>';
+  });
+
+  // Grand total row
+  html += '<tr class="pivot-total-row"><td>Grand Total</td>';
+  buckets.forEach(b => {
+    const t = totals.find(r => r.bucket === b);
+    const u = t ? (t.units || 0) : 0;
+    html += `<td style="text-align:center;">${u > 0 ? u.toLocaleString() : '—'}</td>`;
+  });
+  html += `<td class="pivot-col-total" style="text-align:center;">${(data.grand_total_units || 0).toLocaleString()}</td>`;
+  html += '</tr>';
+
   html += '</tbody></table>';
   wrap.innerHTML = html;
 }
@@ -1487,12 +1511,13 @@ function clearTATFilters() {
 // ── View 5: Ageing ───────────────────────────────────────────────────────
 async function loadAgeing() {
   const res = await apiFetch('/api/ageing');
-  const rows = await res.json();
+  const data = await res.json();
+  const totals = data.totals || [];
 
   const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
-  const labels = rows.map(r => r.bucket);
-  const counts = rows.map(r => r.count);
-  const colors = rows.map(r => BUCKET_COLORS[r.bucket] || '#718096');
+  const labels = totals.map(r => r.bucket);
+  const counts = totals.map(r => r.count);
+  const colors = totals.map(r => BUCKET_COLORS[r.bucket] || '#718096');
 
   getChart('chart-ageing', 'bar', {
     labels,
@@ -1504,13 +1529,17 @@ async function loadAgeing() {
     datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2 }]
   }, { ...CHART_DEFAULTS });
 
-  document.getElementById('ageing-kpis').innerHTML = rows.map(r => `
+  document.getElementById('ageing-kpis').innerHTML = totals.map(r => `
     <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
       <div class="kpi-label">${r.bucket} days</div>
       <div class="kpi-value">${fmtNum(r.count)}</div>
       <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
     </div>
   `).join('');
+
+  // Pivot table below KPIs
+  const ageingPivotWrap = document.getElementById('ageing-pivot-wrap');
+  if (ageingPivotWrap) renderAgeingTable('ageing-pivot-wrap', data);
 }
 
 // ── View 6: Scorecard ────────────────────────────────────────────────────
