@@ -747,7 +747,188 @@ tbody tr.overdue td { color: var(--accent-red); }
 
 .detail-toggle:hover { color: var(--green-700); }
 
+/* ── Team Summary grid ────────────────────────────────────────────────────── */
+.ts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ts-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ts-section-title {
+  padding: 11px 18px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-600);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid var(--border-light);
+  font-family: var(--font-display);
+  background: var(--cream);
+}
+
+.ts-section > div:last-child {
+  max-height: 370px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* ── Summary modal ────────────────────────────────────────────────────────── */
+#ts-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  z-index: 10000;
+  overflow-y: auto;
+}
+
+#ts-modal-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 32px;
+}
+
+#ts-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--green-800);
+}
+
+#ts-modal-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--green-800);
+}
+
+#ts-modal-date {
+  font-size: 12px;
+  color: var(--text-400);
+  margin-top: 4px;
+}
+
+.ts-modal-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.ts-modal-section > div:last-child {
+  overflow-x: auto;
+}
+
+/* ── SKU summary table ────────────────────────────────────────────────────── */
+.sku-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.sku-table thead th {
+  background: var(--cream);
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-600);
+  border-bottom: 2px solid var(--border);
+  font-family: var(--font-display);
+}
+
+.sku-table thead th:first-child { text-align: left; }
+.sku-table thead th:not(:first-child) { text-align: right; }
+
+.sku-table tbody td {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sku-table tbody td:first-child { text-align: left; }
+.sku-table tbody td:not(:first-child) { text-align: right; }
+
+.sku-table tbody tr:last-child td { border-bottom: none; }
+.sku-table tbody tr:hover { background: var(--cream); }
+
+.sku-total-row td {
+  background: var(--green-800) !important;
+  color: #fff !important;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+/* ── Ageing summary table ─────────────────────────────────────────────────── */
+.ageing-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ageing-summary-table thead th {
+  background: var(--cream);
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-600);
+  border-bottom: 2px solid var(--border);
+  font-family: var(--font-display);
+}
+
+.ageing-summary-table thead th:first-child { text-align: left; }
+.ageing-summary-table thead th:not(:first-child) { text-align: right; }
+
+.ageing-summary-table tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.ageing-summary-table tbody td:first-child { text-align: left; }
+.ageing-summary-table tbody td:not(:first-child) { text-align: right; }
+
+.ageing-summary-table tbody tr:last-child td { border-bottom: none; }
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .chart-row { grid-template-columns: 1fr; }
+  .ts-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Print (for Generate Summary modal) ──────────────────────────────────── */
+@media print {
+  #sidebar, #global-filter-bar { display: none !important; }
+  #main { margin-left: 0 !important; }
+  .view { display: none !important; }
+  #ts-modal {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+  }
+  #ts-modal-btn-row { display: none !important; }
+  .ts-grid { page-break-inside: avoid; }
+  .pivot-table thead th,
+  .pivot-ch-row td,
+  .sku-table thead th,
+  .ageing-summary-table thead th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .pivot-total-row td,
+  .sku-total-row td {
+    background: var(--green-800) !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

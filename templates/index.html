@@ -51,6 +51,11 @@
     <span class="nav-icon">📈</span> Trends
   </div>
 
+  <div class="sidebar-section-label">Reports</div>
+  <div class="nav-item" data-view="team-summary">
+    <span class="nav-icon">📋</span> Team Summary
+  </div>
+
   <div class="sidebar-section-label">Data</div>
   <div class="nav-item" data-view="raw-data">
     <span class="nav-icon">🗃️</span> Raw Data 2026
@@ -193,6 +198,14 @@
         </div>
       </div>
 
+      <!-- SKU summary -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:var(--cream);">
+          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">SKU Summary — Delivered Units</span>
+        </div>
+        <div id="del-sku-wrap"></div>
+      </div>
+
       <!-- Shipment detail (collapsible) -->
       <details>
         <summary class="detail-toggle">▶ Shipment Detail Rows</summary>
@@ -265,6 +278,14 @@
         <div id="undel-pivot-wrap" style="overflow-x:auto;">
           <div class="loading-state"><div class="spinner"></div> Loading…</div>
         </div>
+      </div>
+
+      <!-- SKU summary -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:var(--cream);">
+          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">SKU Summary — Pending Units</span>
+        </div>
+        <div id="undel-sku-wrap"></div>
       </div>
 
       <!-- Shipment detail (collapsible) -->
@@ -453,6 +474,106 @@
             <thead id="raw-thead"></thead>
             <tbody id="raw-tbody"><tr><td class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Team Summary ─────────────────────────────────────────────── -->
+  <div class="view" id="view-team-summary">
+    <div class="page-header">
+      <div>
+        <h2>Team Summary</h2>
+        <div class="subtitle" id="ts-subtitle">Daily operations overview — ready to screenshot &amp; share</div>
+      </div>
+      <button class="btn btn-primary" onclick="openSummaryModal()" style="display:flex;align-items:center;gap:6px;padding:9px 18px;">
+        📸 Generate Summary
+      </button>
+    </div>
+    <div class="content-area">
+
+      <!-- Filter bar -->
+      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <label>Channel</label>
+        <div class="ms-dropdown" id="ms-ts-channel" data-all-label="All Channels">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-ts-channel')">
+            <span class="ms-label">All Channels</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-ts-channel',this)" checked> All</label>
+            <label class="ms-option"><input type="checkbox" value="Amazon" onchange="msItemToggle('ms-ts-channel',this)"> Amazon</label>
+            <label class="ms-option"><input type="checkbox" value="TikTok" onchange="msItemToggle('ms-ts-channel',this)"> TikTok</label>
+            <label class="ms-option"><input type="checkbox" value="Shipbob" onchange="msItemToggle('ms-ts-channel',this)"> Shipbob</label>
+          </div>
+        </div>
+        <label>Period</label>
+        <select id="ts-period" onchange="applyPeriod(this,'ts-from','ts-to',loadTeamSummary)">
+          <option value="">All</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="60">Last 60 days</option>
+        </select>
+        <label>Del From</label>
+        <input type="date" id="ts-from">
+        <label>To</label>
+        <input type="date" id="ts-to">
+        <button class="btn btn-primary" onclick="loadTeamSummary()">Apply</button>
+        <button class="gf-clear-btn" onclick="clearTeamSummaryFilters()">✕ Clear</button>
+      </div>
+
+      <!-- 2×2 summary grid -->
+      <div class="ts-grid">
+        <div class="card ts-section">
+          <div class="ts-section-title">Delivered Units — Channel × Date</div>
+          <div id="ts-del-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
+        </div>
+        <div class="card ts-section">
+          <div class="ts-section-title">Pending Shipments — Channel × Exp Delivery</div>
+          <div id="ts-undel-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
+        </div>
+        <div class="card ts-section">
+          <div class="ts-section-title">TAT Analysis — Channel × Transporter</div>
+          <div id="ts-tat-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
+        </div>
+        <div class="card ts-section">
+          <div class="ts-section-title">Undelivered Ageing Buckets</div>
+          <div id="ts-ageing"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Team Summary Modal ─────────────────────────────────────────────── -->
+  <div id="ts-modal">
+    <div id="ts-modal-inner">
+      <div id="ts-modal-header">
+        <div>
+          <div id="ts-modal-title">Root Labs · Supply Chain Daily Summary</div>
+          <div id="ts-modal-date"></div>
+        </div>
+        <div id="ts-modal-btn-row" style="display:flex;gap:10px;">
+          <button onclick="window.print()" class="btn btn-primary" style="display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
+          <button onclick="closeSummaryModal()" class="gf-clear-btn">✕ Close</button>
+        </div>
+      </div>
+      <div class="ts-grid">
+        <div class="ts-modal-section">
+          <div class="ts-section-title">Delivered Units</div>
+          <div id="ts-modal-del" style="overflow-x:auto;"></div>
+        </div>
+        <div class="ts-modal-section">
+          <div class="ts-section-title">Pending Shipments</div>
+          <div id="ts-modal-undel" style="overflow-x:auto;"></div>
+        </div>
+        <div class="ts-modal-section">
+          <div class="ts-section-title">TAT Analysis</div>
+          <div id="ts-modal-tat" style="overflow-x:auto;"></div>
+        </div>
+        <div class="ts-modal-section">
+          <div class="ts-section-title">Ageing Buckets</div>
+          <div id="ts-modal-ageing" style="overflow-x:auto;"></div>
         </div>
       </div>
     </div>
@@ -661,6 +782,7 @@ function loadView(view, force) {
     case 'channel-health': return loadChannelHealth();
     case 'trends':         return loadTrends();
     case 'raw-data':       return loadRawData();
+    case 'team-summary':   return loadTeamSummary();
   }
 }
 
@@ -977,6 +1099,7 @@ async function loadDelivered() {
   _delRows = data.rows;
   buildThead('del-thead', DEL_COLS, _delSort, 'clickDelSort', 'del');
   renderDelRows();
+  renderDelSku();
 }
 
 function clearDeliveredFilters() {
@@ -1163,6 +1286,7 @@ async function loadUndelivered() {
   _undelRows = rows;
   buildThead('undel-thead', UNDEL_COLS, _undelSort, 'clickUndelSort', 'undel');
   renderUndelRows();
+  renderUndelSku();
 }
 
 function clearUndeliveredFilters() {
@@ -1210,18 +1334,20 @@ async function loadTAT() {
   renderTATPivot(data);
 }
 
-function renderTATPivot(data) {
-  const wrap = document.getElementById('tat-pivot-wrap');
+function renderTATPivotTo(wrapId, labelId, data) {
+  const wrap = document.getElementById(wrapId);
   const { transporters, rows, totals, overall } = data;
 
   if (!transporters.length) {
     wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-400);font-size:13px;">No delivery data for the selected filters</div>';
-    document.getElementById('tat-pivot-label').textContent = '';
+    if (labelId) document.getElementById(labelId).textContent = '';
     return;
   }
 
-  document.getElementById('tat-pivot-label').textContent =
-    'Updated: ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+  if (labelId) {
+    document.getElementById(labelId).textContent =
+      'Updated: ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+  }
 
   // Two-row header: transporter name spans 2 cols, sub-headers Count | Avg TAT
   let html = '<table class="pivot-table"><thead><tr>';
@@ -1266,6 +1392,31 @@ function renderTATPivot(data) {
   html += `<td class="pivot-col-total" style="text-align:center;opacity:0.8;">${overall.avg_tat != null ? overall.avg_tat + 'd' : ''}</td>`;
   html += '</tr>';
 
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function renderTATPivot(data) { renderTATPivotTo('tat-pivot-wrap', 'tat-pivot-label', data); }
+
+function renderAgeingTable(wrapId, rows) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  if (!rows || !rows.length) { wrap.innerHTML = '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>'; return; }
+  const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  let html = '<table class="ageing-summary-table"><thead><tr>';
+  html += '<th>Ageing Bucket</th><th>Shipments</th><th>% of Total</th>';
+  html += '</tr></thead><tbody>';
+  rows.forEach(r => {
+    const color = BUCKET_COLORS[r.bucket] || '#718096';
+    const pct = total > 0 ? (r.count / total * 100).toFixed(1) : '0.0';
+    html += `<tr>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:8px;vertical-align:middle;"></span><strong>${r.bucket}</strong> days</td>
+      <td>${r.count.toLocaleString()}</td>
+      <td style="color:var(--text-400);">${pct}%</td>
+    </tr>`;
+  });
+  html += `<tr class="pivot-total-row"><td>Total</td><td>${total.toLocaleString()}</td><td>100%</td></tr>`;
   html += '</tbody></table>';
   wrap.innerHTML = html;
 }
@@ -1436,6 +1587,129 @@ async function loadRawData() {
       Failed to load: ${err.message}</td></tr>`;
     console.error('loadRawData error:', err);
   }
+}
+
+// ── SKU Summaries ─────────────────────────────────────────────────────────
+function buildSkuTable(rows, prodKey, qtyKey, shipLabel, unitsLabel) {
+  if (!rows.length) return '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>';
+  const skuMap = {};
+  rows.forEach(r => {
+    const prod = r[prodKey] || '(unspecified)';
+    if (!skuMap[prod]) skuMap[prod] = { count: 0, qty: 0 };
+    skuMap[prod].count++;
+    skuMap[prod].qty += Number(r[qtyKey]) || 0;
+  });
+  const entries = Object.entries(skuMap).sort((a, b) => b[1].qty - a[1].qty);
+  const totalShipments = entries.reduce((s, [, v]) => s + v.count, 0);
+  const totalQty       = entries.reduce((s, [, v]) => s + v.qty, 0);
+  let html = `<table class="sku-table"><thead><tr><th>SKU / Product</th><th>${shipLabel}</th><th>${unitsLabel}</th></tr></thead><tbody>`;
+  entries.forEach(([prod, v]) => {
+    html += `<tr><td>${escHtml(prod)}</td><td>${v.count.toLocaleString()}</td><td><strong>${v.qty.toLocaleString()}</strong></td></tr>`;
+  });
+  html += `<tr class="sku-total-row"><td>Total</td><td>${totalShipments.toLocaleString()}</td><td>${totalQty.toLocaleString()}</td></tr>`;
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderDelSku() {
+  const wrap = document.getElementById('del-sku-wrap');
+  if (wrap) wrap.innerHTML = buildSkuTable(_delRows, 'Product Name', 'Qty Sent', 'Shipments', 'Units Delivered');
+}
+
+function renderUndelSku() {
+  const wrap = document.getElementById('undel-sku-wrap');
+  if (wrap) wrap.innerHTML = buildSkuTable(_undelRows, 'Product Name', 'Qty Sent', 'Pending Shipments', 'Pending Units');
+}
+
+// ── Team Summary ──────────────────────────────────────────────────────────
+let _tsDelPivotData = null, _tsUndelPivotData = null, _tsTATData = null, _tsAgeingRows = [];
+
+async function loadTeamSummary() {
+  // Apply default 7-day window on first load if no dates set
+  const period = document.getElementById('ts-period').value;
+  const fromEl = document.getElementById('ts-from');
+  const toEl   = document.getElementById('ts-to');
+  if (period && !fromEl.value && !toEl.value) {
+    const today = new Date();
+    const from  = new Date(today);
+    from.setDate(today.getDate() - parseInt(period) + 1);
+    fromEl.value = from.toISOString().split('T')[0];
+    toEl.value   = today.toISOString().split('T')[0];
+  }
+
+  const channels = getMsValues('ms-ts-channel');
+  const from = fromEl.value, to = toEl.value;
+
+  ['ts-del-pivot','ts-undel-pivot','ts-tat-pivot','ts-ageing'].forEach(id => {
+    document.getElementById(id).innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
+  });
+
+  const delExtra = new URLSearchParams();
+  if (channels.length) delExtra.set('channels', channels.join(','));
+  if (from) delExtra.set('from', from);
+  if (to)   delExtra.set('to', to);
+
+  const undelExtra = new URLSearchParams();
+  if (channels.length) undelExtra.set('channels', channels.join(','));
+
+  const tatExtra = new URLSearchParams();
+  if (channels.length) tatExtra.set('channels', channels.join(','));
+  if (from) tatExtra.set('from', from);
+  if (to)   tatExtra.set('to', to);
+
+  const [delRes, undelRes, tatRes, ageingRes] = await Promise.all([
+    apiFetch('/api/delivered-pivot', delExtra),
+    apiFetch('/api/undelivered-pivot', undelExtra),
+    apiFetch('/api/tat-pivot', tatExtra),
+    apiFetch('/api/ageing'),
+  ]);
+
+  _tsDelPivotData   = await delRes.json();
+  _tsUndelPivotData = await undelRes.json();
+  _tsTATData        = await tatRes.json();
+  _tsAgeingRows     = await ageingRes.json();
+
+  renderPivotTo('ts-del-pivot',   null, _tsDelPivotData);
+  renderPivotTo('ts-undel-pivot', null, _tsUndelPivotData);
+  renderTATPivotTo('ts-tat-pivot', null, _tsTATData);
+  renderAgeingTable('ts-ageing', _tsAgeingRows);
+
+  const from2 = fromEl.value, to2 = toEl.value;
+  document.getElementById('ts-subtitle').textContent =
+    from2 && to2 ? `Deliveries ${from2} → ${to2} · Pending = current state`
+    : 'All deliveries · Pending = current state';
+}
+
+function clearTeamSummaryFilters() {
+  const el = document.getElementById('ms-ts-channel');
+  el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  const allCb = el.querySelector('input[value="__all__"]');
+  if (allCb) allCb.checked = true;
+  updateMsLabel('ms-ts-channel');
+  document.getElementById('ts-period').value = '7';
+  const today = new Date();
+  const from  = new Date(today);
+  from.setDate(today.getDate() - 6);
+  document.getElementById('ts-from').value = from.toISOString().split('T')[0];
+  document.getElementById('ts-to').value   = today.toISOString().split('T')[0];
+  loadTeamSummary();
+}
+
+function openSummaryModal() {
+  if (!_tsDelPivotData) { alert('Load the Team Summary tab first.'); return; }
+  document.getElementById('ts-modal-del').innerHTML   = document.getElementById('ts-del-pivot').innerHTML;
+  document.getElementById('ts-modal-undel').innerHTML = document.getElementById('ts-undel-pivot').innerHTML;
+  document.getElementById('ts-modal-tat').innerHTML   = document.getElementById('ts-tat-pivot').innerHTML;
+  document.getElementById('ts-modal-ageing').innerHTML = document.getElementById('ts-ageing').innerHTML;
+  document.getElementById('ts-modal-date').textContent =
+    new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('ts-modal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSummaryModal() {
+  document.getElementById('ts-modal').style.display = 'none';
+  document.body.style.overflow = '';
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
