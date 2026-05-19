@@ -952,8 +952,8 @@ tbody tr.overdue td { color: var(--accent-red); }
 }
 
 .ts-group-label {
-  padding: 11px 20px;
-  font-size: 10px; font-weight: 800;
+  padding: 13px 20px;
+  font-size: 13px; font-weight: 800;
   text-transform: uppercase; letter-spacing: 1.5px;
   font-family: var(--font-display);
   border-bottom: 1px solid #1d2d44;
@@ -975,7 +975,7 @@ tbody tr.overdue td { color: var(--accent-red); }
 .ts-section-divider {
   height: 1px;
   background: linear-gradient(90deg, transparent 0%, #1d2d44 15%, #1d2d44 85%, transparent 100%);
-  margin: 20px 0;
+  margin: 36px 0;
   position: relative;
 }
 
@@ -1003,11 +1003,11 @@ tbody tr.overdue td { color: var(--accent-red); }
 }
 
 .ts-ms:last-child { border-bottom: none; }
-.ts-ms > div:last-child { overflow-x: auto; }
+.ts-ms > div:last-child { overflow-x: auto; padding-bottom: 20px; }
 
 .ts-ms-header {
-  padding: 11px 20px;
-  font-size: 10px; font-weight: 800;
+  padding: 14px 20px;
+  font-size: 13px; font-weight: 800;
   text-transform: uppercase; letter-spacing: 1px;
   font-family: var(--font-display);
   border-left: 3px solid;
