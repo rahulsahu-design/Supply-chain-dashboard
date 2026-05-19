@@ -25,7 +25,7 @@ PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
 PROM_TAT_DEFAULT = 12
 
 _cache = {"df": None, "fetched_at": None}
-CACHE_TTL_SECONDS = 600  # 10 minutes
+CACHE_TTL_SECONDS = 1800  # 30 minutes
 
 # Cached worksheet — avoids re-authenticating + re-opening the sheet every refresh
 _ws_cache = {"sheet": None, "last_connect": None}

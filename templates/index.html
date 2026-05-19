@@ -74,7 +74,7 @@
   <div id="global-filter-bar">
     <div class="gf-group">
       <label>Year</label>
-      <select id="gf-year"><option value="All">All</option></select>
+      <select id="gf-year"><option value="All">All</option><option value="2026" selected>2026</option></select>
     </div>
     <div class="gf-group">
       <label>Month</label>
@@ -642,6 +642,7 @@ const PALETTE = ['#4f8ef7','#38a169','#dd6b20','#805ad5','#e53e3e','#d69e2e','#3
 const CHART_DEFAULTS = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: { duration: 0 },
   plugins: { legend: { labels: { font: { size: 12 } } } },
 };
 
@@ -685,7 +686,7 @@ let _maxDeliveryDate = null;
 
 // Client-side API response cache — avoids redundant server calls within a session
 const _apiCache = new Map();
-const API_CACHE_TTL_MS = 4 * 60 * 1000; // 4 minutes
+const API_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 async function apiFetch(path, extraParams) {
   const p = getFilterParams();
@@ -715,7 +716,12 @@ async function loadFilterOptions() {
   const opts = await res.json();
 
   const yearSel = document.getElementById('gf-year');
-  opts.years.forEach(y => { const o = document.createElement('option'); o.value = o.textContent = y; yearSel.appendChild(o); });
+  opts.years.forEach(y => {
+    if (yearSel.querySelector(`option[value="${y}"]`)) return;
+    const o = document.createElement('option'); o.value = o.textContent = y;
+    const insertBefore = Array.from(yearSel.options).find(op => !isNaN(op.value) && parseInt(op.value) > parseInt(y));
+    if (insertBefore) yearSel.insertBefore(o, insertBefore); else yearSel.appendChild(o);
+  });
 
   const monthSel = document.getElementById('gf-month');
   opts.months.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; monthSel.appendChild(o); });
@@ -761,6 +767,13 @@ async function loadFilterOptions() {
   (opts.exp_del_weeks || []).forEach(w => {
     tsUndelWeekPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-ts-undel-week',this)"> W${w}</label>`;
   });
+
+  // Default all tab-specific year filters to 2026 (gf-year is already set via HTML)
+  ['del-year', 'undel-year', 'ts-undel-year'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '2026';
+  });
+  updateFilterBadge();
 }
 
 // ── Multi-select helpers ─────────────────────────────────────────────────────
@@ -890,8 +903,21 @@ function bucketBadge(b) {
   return `<span class="badge ${cls}">${b || '—'}</span>`;
 }
 
+// ── Skeleton helpers ─────────────────────────────────────────────────────
+function skelKpis(n) {
+  return Array.from({length: n}, () =>
+    `<div class="kpi-card" style="pointer-events:none;">
+       <div class="skel" style="height:10px;width:72%;margin-bottom:12px;"></div>
+       <div class="skel" style="height:28px;width:48%;"></div>
+     </div>`).join('');
+}
+function skelTable() {
+  return '<div class="skel" style="height:180px;margin:16px;border-radius:6px;"></div>';
+}
+
 // ── View 1: Daily Summary ────────────────────────────────────────────────
 async function loadSummary() {
+  document.getElementById('summary-kpis').innerHTML = skelKpis(6);
   const res = await apiFetch('/api/daily-summary');
   const s = await res.json();
 
@@ -1122,6 +1148,9 @@ function renderDelRows() {
 }
 
 async function loadDelivered() {
+  document.getElementById('pivot-wrap').innerHTML = skelTable();
+  document.getElementById('del-tat-kpis').innerHTML = skelKpis(2);
+  document.getElementById('del-tat-pivot-wrap').innerHTML = skelTable();
   const channels = getMsValues('ms-del-channel');
   const delWeeks = getMsValues('ms-del-week');
   const from    = document.getElementById('del-from').value;
@@ -1303,6 +1332,8 @@ function renderUndelRows() {
 }
 
 async function loadUndelivered() {
+  document.getElementById('undel-kpis').innerHTML = skelKpis(4);
+  document.getElementById('undel-pivot-wrap').innerHTML = skelTable();
   const channels    = getMsValues('ms-undel-channel');
   const expDelWeeks = getMsValues('ms-undel-exp-week');
   const from  = document.getElementById('undel-from').value;
@@ -1905,6 +1936,9 @@ async function apiFetch2025(path, qs) {
 }
 
 async function loadSummary2025() {
+  document.getElementById('summary-2025-kpis').innerHTML = skelKpis(6);
+  ['summary-2025-del-pivot','summary-2025-tat-pivot','summary-2025-undel-pivot','summary-2025-ageing']
+    .forEach(id => { document.getElementById(id).innerHTML = skelTable(); });
   const DEL_QS   = 'del_year=2025&from=2025-01-01&to=2025-12-31';
   const UNDEL_QS = 'undel_year=2025';
 
@@ -1953,15 +1987,9 @@ async function loadSummary2025() {
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
-// Load filter options first, then default all year dropdowns to 2026, then load the initial view
-loadFilterOptions().then(() => {
-  ['gf-year', 'del-year', 'undel-year', 'ts-undel-year'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '2026';
-  });
-  updateFilterBadge();
-  loadView('daily-summary');
-});
+// gf-year is pre-selected to 2026 in the HTML, so loadView fires in parallel with loadFilterOptions.
+// loadFilterOptions sets the remaining tab year defaults (del-year, undel-year, ts-undel-year) once loaded.
+Promise.all([loadFilterOptions(), loadView('daily-summary')]);
 document.getElementById('last-updated').textContent = 'Loaded ' + new Date().toLocaleTimeString();
 </script>
 
