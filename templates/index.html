@@ -175,6 +175,9 @@
         <button class="gf-clear-btn" onclick="clearDeliveredFilters()">✕ Clear</button>
       </div>
 
+      <!-- TAT KPIs — above pivot -->
+      <div class="kpi-grid" id="del-tat-kpis" style="margin-bottom:16px;"></div>
+
       <!-- Delivered pivot table -->
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid #e2e8f0;">
@@ -185,9 +188,6 @@
           <div class="loading-state"><div class="spinner"></div> Loading…</div>
         </div>
       </div>
-
-      <!-- TAT KPIs -->
-      <div class="kpi-grid" id="del-tat-kpis" style="margin-bottom:24px;"></div>
 
       <!-- TAT pivot table -->
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
@@ -494,6 +494,7 @@
       <!-- Delivered Pivot -->
       <div class="card ts-section">
         <div class="ts-section-header ts-header-del">📦 Delivered Units — Channel × Date</div>
+        <div class="kpi-grid" id="ts-del-kpis" style="margin:12px 0 4px;"></div>
         <div id="ts-del-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
       </div>
 
@@ -1730,6 +1731,7 @@ async function loadTeamSummary() {
   ['ts-del-pivot','ts-undel-pivot','ts-tat-pivot','ts-ageing'].forEach(id => {
     document.getElementById(id).innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
   });
+  document.getElementById('ts-del-kpis').innerHTML = skelKpis(2);
 
   const delExtra = new URLSearchParams();
   if (channels.length) delExtra.set('channels', channels.join(','));
@@ -1759,6 +1761,17 @@ async function loadTeamSummary() {
   _tsUndelPivotData = await undelRes.json();
   _tsTATData        = await tatRes.json();
   _tsAgeingRows     = await ageingRes.json();
+
+  const _tatOverall = (_tsTATData && _tsTATData.overall) || {};
+  document.getElementById('ts-del-kpis').innerHTML = `
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">Total Deliveries</div>
+      <div class="kpi-value">${fmtNum(_tatOverall.count)}</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Overall Avg TAT</div>
+      <div class="kpi-value">${fmtFloat(_tatOverall.avg_tat)}<span style="font-size:16px;font-weight:600;margin-left:4px;">days</span></div>
+    </div>`;
 
   renderPivotTo('ts-del-pivot',   null, _tsDelPivotData);
   renderPivotTo('ts-undel-pivot', null, _tsUndelPivotData);
