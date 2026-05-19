@@ -42,9 +42,6 @@
   <div class="nav-item" data-view="channel-health">
     <span class="nav-icon">🏪</span> Channel Health
   </div>
-  <div class="nav-item" data-view="trends">
-    <span class="nav-icon">📈</span> Trends
-  </div>
 
   <div class="sidebar-section-label">Reports</div>
   <div class="nav-item" data-view="team-summary">
@@ -354,26 +351,6 @@
     </div>
   </div>
 
-  <!-- ── View: Trends ─────────────────────────────────────────────────── -->
-  <div class="view" id="view-trends">
-    <div class="page-header">
-      <div>
-        <h2>Weekly &amp; Monthly Trends</h2>
-        <div class="subtitle">Delivery trends over time</div>
-      </div>
-    </div>
-    <div class="content-area">
-      <div class="card" style="margin-bottom:16px;">
-        <h3>Weekly Deliveries</h3>
-        <div class="chart-wrap" style="height:260px;"><canvas id="chart-weekly"></canvas></div>
-      </div>
-      <div class="card">
-        <h3>Monthly Deliveries</h3>
-        <div class="chart-wrap" style="height:260px;"><canvas id="chart-monthly"></canvas></div>
-      </div>
-    </div>
-  </div>
-
   <!-- ── View: Raw Data 2026 ──────────────────────────────────────────── -->
   <div class="view" id="view-raw-data">
     <div class="page-header">
@@ -521,39 +498,47 @@
 
       <!-- Brand header -->
       <div id="ts-modal-header">
+        <div class="header-grid"></div>
         <div id="ts-modal-logo">RL</div>
         <div id="ts-modal-heading">
           <div id="ts-modal-title">Root Labs</div>
-          <div id="ts-modal-subtitle">Supply Chain Daily Summary</div>
+          <div id="ts-modal-subtitle">Supply Chain Summary Report</div>
           <div id="ts-modal-date"></div>
         </div>
+        <div id="ts-modal-header-badge">LIVE</div>
       </div>
 
       <!-- KPI chips -->
       <div id="ts-kpi-strip"></div>
 
-      <!-- Deliveries pivot -->
-      <div class="ts-ms ts-ms-del">
-        <div class="ts-ms-header">📦 Deliveries — Channel × Date</div>
-        <div id="ts-modal-del" style="overflow-x:auto;"></div>
+      <!-- Section: Delivery & TAT -->
+      <div class="ts-section-group ts-group-delivery">
+        <div class="ts-group-label">📦 Delivery Performance</div>
+        <div class="ts-ms ts-ms-del">
+          <div class="ts-ms-header">Deliveries — Channel × Date</div>
+          <div id="ts-modal-del" style="overflow-x:auto;"></div>
+        </div>
+        <div class="ts-ms ts-ms-tat">
+          <div class="ts-ms-header">⚡ TAT Analysis — Channel × Transporter</div>
+          <div id="ts-modal-tat" style="overflow-x:auto;"></div>
+        </div>
       </div>
 
-      <!-- TAT pivot -->
-      <div class="ts-ms ts-ms-tat">
-        <div class="ts-ms-header">⚡ TAT Analysis — Channel × Transporter</div>
-        <div id="ts-modal-tat" style="overflow-x:auto;"></div>
-      </div>
+      <!-- Divider -->
+      <div class="ts-section-divider"></div>
 
-      <!-- Pending pivot -->
-      <div class="ts-ms ts-ms-undel">
-        <div class="ts-ms-header">🚚 Pending Shipments — Channel × Exp Delivery</div>
-        <div id="ts-modal-undel" style="overflow-x:auto;"></div>
-      </div>
-
-      <!-- Ageing pivot -->
-      <div class="ts-ms ts-ms-ageing">
-        <div class="ts-ms-header">⏳ Ageing Analysis — Transporter × Bucket</div>
-        <div id="ts-modal-ageing" style="overflow-x:auto;"></div>
+      <!-- Section: Pending & Ageing -->
+      <div class="ts-section-group ts-group-pending">
+        <div class="ts-group-label">🚚 Pending &amp; Ageing Status</div>
+        <div class="ts-ms ts-ms-undel">
+          <div class="ts-ms-header">Pending Shipments — Channel × Exp Delivery</div>
+          <div id="ts-modal-undel" style="overflow-x:auto;"></div>
+        </div>
+        <div id="ts-modal-ageing-kpis"></div>
+        <div class="ts-ms ts-ms-ageing">
+          <div class="ts-ms-header">⏳ Ageing — Transporter × Bucket</div>
+          <div id="ts-modal-ageing" style="overflow-x:auto;"></div>
+        </div>
       </div>
 
       <!-- Narrative summary -->
@@ -853,7 +838,6 @@ function loadView(view, force) {
     case 'undelivered':    return loadUndelivered();
     case 'scorecard':      return loadScorecard();
     case 'channel-health': return loadChannelHealth();
-    case 'trends':         return loadTrends();
     case 'raw-data':       return loadRawData();
     case 'team-summary':   return loadTeamSummary();
     case 'summary-2025':   return loadSummary2025();
@@ -1564,22 +1548,6 @@ async function loadChannelHealth() {
   `).join('');
 }
 
-// ── View 8: Trends ───────────────────────────────────────────────────────
-async function loadTrends() {
-  const res = await apiFetch('/api/trends');
-  const data = await res.json();
-
-  getChart('chart-weekly', 'line', {
-    labels: data.weekly.map(r => r.week_label),
-    datasets: [{ label: 'Deliveries', data: data.weekly.map(r => r.deliveries), borderColor: '#4f8ef7', backgroundColor: 'rgba(79,142,247,0.1)', fill: true, tension: 0.3, pointRadius: 4 }]
-  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
-
-  getChart('chart-monthly', 'bar', {
-    labels: data.monthly.map(r => r.month_label),
-    datasets: [{ label: 'Deliveries', data: data.monthly.map(r => r.deliveries), backgroundColor: '#38a169', borderRadius: 6 }]
-  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
-}
-
 // ── View 9: Raw Data 2026 ────────────────────────────────────────────────
 const RAW_COL_TYPES = {
   'Prom TAT':'num','Actual TAT':'num','Delay Days':'num','Ageing':'num','Qty Sent':'num',
@@ -1803,10 +1771,11 @@ function openSummaryModal() {
   if (!_tsDelPivotData) { alert('Load the Team Summary tab first.'); return; }
 
   // Copy tables
-  document.getElementById('ts-modal-del').innerHTML    = document.getElementById('ts-del-pivot').innerHTML;
-  document.getElementById('ts-modal-tat').innerHTML    = document.getElementById('ts-tat-pivot').innerHTML;
-  document.getElementById('ts-modal-undel').innerHTML  = document.getElementById('ts-undel-pivot').innerHTML;
-  document.getElementById('ts-modal-ageing').innerHTML = document.getElementById('ts-ageing').innerHTML;
+  document.getElementById('ts-modal-del').innerHTML         = document.getElementById('ts-del-pivot').innerHTML;
+  document.getElementById('ts-modal-tat').innerHTML         = document.getElementById('ts-tat-pivot').innerHTML;
+  document.getElementById('ts-modal-undel').innerHTML       = document.getElementById('ts-undel-pivot').innerHTML;
+  document.getElementById('ts-modal-ageing-kpis').innerHTML = document.getElementById('ts-ageing-kpis').innerHTML;
+  document.getElementById('ts-modal-ageing').innerHTML      = document.getElementById('ts-ageing').innerHTML;
 
   // Dates
   const now = new Date();
