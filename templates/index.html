@@ -56,6 +56,11 @@
     <span class="nav-icon">🗃️</span> Raw Data 2026
   </div>
 
+  <div class="sidebar-section-label">Archive</div>
+  <div class="nav-item" data-view="summary-2025">
+    <span class="nav-icon">📅</span> 2025 Summary
+  </div>
+
   <div class="sidebar-footer">
     <button id="refresh-btn" onclick="refreshData()">↻ Refresh Data</button>
     <div class="last-updated" id="last-updated">Not yet loaded</div>
@@ -568,6 +573,59 @@
     </div>
   </div>
 
+  <!-- ── View: 2025 Annual Summary ─────────────────────────────────────── -->
+  <div class="view" id="view-summary-2025">
+    <div class="page-header">
+      <div>
+        <h2>2025 Annual Summary</h2>
+        <div class="subtitle">Full-year 2025 shipment overview — archived data</div>
+      </div>
+    </div>
+    <div class="content-area">
+
+      <div class="kpi-grid" id="summary-2025-kpis" style="margin-bottom:24px;">
+        <div class="loading-state"><div class="spinner"></div> Loading…</div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#d1fae5;">
+          <span style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #10b981;padding-left:10px;">📦 Delivered Units — Channel × Date (2025)</span>
+        </div>
+        <div id="summary-2025-del-pivot" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#dbeafe;">
+          <span style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #3b82f6;padding-left:10px;">⚡ TAT Analysis — Channel × Transporter (2025)</span>
+        </div>
+        <div id="summary-2025-tat-pivot" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fef3c7;">
+          <span style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #f59e0b;padding-left:10px;">🚚 Pending Shipments — Channel × Exp Delivery (2025)</span>
+        </div>
+        <div id="summary-2025-undel-pivot" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fee2e2;">
+          <span style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #ef4444;padding-left:10px;">⏳ Ageing — Transporter × Bucket (2025)</span>
+        </div>
+        <div id="summary-2025-ageing" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div><!-- /#main -->
 
 <script>
@@ -613,7 +671,7 @@ function updateFilterBadge() {
 }
 
 function clearFilters() {
-  document.getElementById('gf-year').value = 'All';
+  document.getElementById('gf-year').value = '2026';
   document.getElementById('gf-month').value = 'All';
   document.getElementById('gf-week').value = 'All';
   document.getElementById('gf-date-from').value = '';
@@ -794,6 +852,7 @@ function loadView(view, force) {
     case 'trends':         return loadTrends();
     case 'raw-data':       return loadRawData();
     case 'team-summary':   return loadTeamSummary();
+    case 'summary-2025':   return loadSummary2025();
   }
 }
 
@@ -1127,7 +1186,7 @@ function clearDeliveredFilters() {
     if (allCb) allCb.checked = true;
     updateMsLabel(id);
   });
-  document.getElementById('del-year').value = 'All';
+  document.getElementById('del-year').value = '2026';
   document.getElementById('del-period').value = '';
   document.getElementById('del-from').value = '';
   document.getElementById('del-to').value = '';
@@ -1343,7 +1402,7 @@ function clearUndeliveredFilters() {
   });
   document.getElementById('undel-from').value = '';
   document.getElementById('undel-to').value = '';
-  document.getElementById('undel-year').value = 'All';
+  document.getElementById('undel-year').value = '2026';
   loadUndelivered();
 }
 
@@ -1704,7 +1763,7 @@ function clearTsUndelFilters() {
     if (allCb) allCb.checked = true;
     updateMsLabel(id);
   });
-  document.getElementById('ts-undel-year').value = 'All';
+  document.getElementById('ts-undel-year').value = '2026';
   document.getElementById('ts-undel-from').value = '';
   document.getElementById('ts-undel-to').value   = '';
   loadTeamSummary();
@@ -1835,9 +1894,74 @@ function closeSummaryModal() {
   document.body.style.overflow = '';
 }
 
+// ── 2025 Archive Summary ──────────────────────────────────────────────────
+async function apiFetch2025(path, qs) {
+  const url = path + '?year=2025' + (qs ? '&' + qs : '');
+  const hit = _apiCache.get(url);
+  if (hit && Date.now() - hit.ts < API_CACHE_TTL_MS) return hit.data;
+  const data = await fetch(url).then(r => r.json());
+  _apiCache.set(url, { data, ts: Date.now() });
+  return data;
+}
+
+async function loadSummary2025() {
+  const DEL_QS   = 'del_year=2025&from=2025-01-01&to=2025-12-31';
+  const UNDEL_QS = 'undel_year=2025';
+
+  const [s, delPivot, tat, undelPivot, ageing] = await Promise.all([
+    apiFetch2025('/api/daily-summary'),
+    apiFetch2025('/api/delivered-pivot', DEL_QS),
+    apiFetch2025('/api/tat-pivot', DEL_QS),
+    apiFetch2025('/api/undelivered-pivot', UNDEL_QS),
+    apiFetch2025('/api/ageing', UNDEL_QS),
+  ]);
+
+  const deliveryRate = s.total_shipments > 0
+    ? (s.delivered / s.total_shipments * 100).toFixed(1) : null;
+
+  document.getElementById('summary-2025-kpis').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Total Shipments (2025)</div>
+      <div class="kpi-value">${fmtNum(s.total_shipments)}</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">Delivered</div>
+      <div class="kpi-value">${fmtNum(s.delivered)}</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Pending / Undelivered</div>
+      <div class="kpi-value">${fmtNum(s.undelivered)}</div>
+    </div>
+    <div class="kpi-card accent-red">
+      <div class="kpi-label">Overdue (21+ days)</div>
+      <div class="kpi-value">${fmtNum(s.overdue)}</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">Delivery Rate</div>
+      <div class="kpi-value">${deliveryRate != null ? deliveryRate + '%' : '—'}</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Avg TAT</div>
+      <div class="kpi-value">${tat.overall && tat.overall.avg_tat != null ? fmtFloat(tat.overall.avg_tat) + 'd' : '—'}</div>
+    </div>
+  `;
+
+  renderPivotTo('summary-2025-del-pivot', null, delPivot);
+  renderTATPivotTo('summary-2025-tat-pivot', null, tat);
+  renderPivotTo('summary-2025-undel-pivot', null, undelPivot);
+  renderAgeingTable('summary-2025-ageing', ageing);
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────
-// Fire filter-options and the default view in parallel — neither depends on the other completing first
-Promise.all([loadFilterOptions(), loadView('daily-summary')]);
+// Load filter options first, then default all year dropdowns to 2026, then load the initial view
+loadFilterOptions().then(() => {
+  ['gf-year', 'del-year', 'undel-year', 'ts-undel-year'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '2026';
+  });
+  updateFilterBadge();
+  loadView('daily-summary');
+});
 document.getElementById('last-updated').textContent = 'Loaded ' + new Date().toLocaleTimeString();
 </script>
 
