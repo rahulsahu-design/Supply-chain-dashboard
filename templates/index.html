@@ -290,17 +290,6 @@
         <div id="undel-sku-wrap"></div>
       </div>
 
-      <!-- Ageing charts -->
-      <div class="chart-row" style="margin-bottom:0;">
-        <div class="card">
-          <h3>Ageing Buckets</h3>
-          <div class="chart-wrap"><canvas id="chart-ageing"></canvas></div>
-        </div>
-        <div class="card">
-          <h3>Distribution</h3>
-          <div class="chart-wrap"><canvas id="chart-ageing-pie"></canvas></div>
-        </div>
-      </div>
       <div class="kpi-grid" id="ageing-kpis" style="margin-bottom:24px;"></div>
 
       <!-- Ageing pivot -->
@@ -1397,22 +1386,8 @@ async function loadUndelivered() {
   renderUndelRows();
   renderUndelSku();
 
-  // Ageing charts + KPI cards + pivot (same filters as undelivered)
+  // Ageing KPI cards + pivot (same filters as undelivered)
   const ageingTotals = ageingData.totals || [];
-  const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
-  const ageLabels = ageingTotals.map(r => r.bucket);
-  const ageCounts = ageingTotals.map(r => r.count);
-  const ageColors = ageingTotals.map(r => BUCKET_COLORS[r.bucket] || '#718096');
-
-  getChart('chart-ageing', 'bar', {
-    labels: ageLabels,
-    datasets: [{ label: 'Shipments', data: ageCounts, backgroundColor: ageColors, borderRadius: 6 }]
-  }, { ...CHART_DEFAULTS, scales: { y: { beginAtZero: true } } });
-
-  getChart('chart-ageing-pie', 'doughnut', {
-    labels: ageLabels,
-    datasets: [{ data: ageCounts, backgroundColor: ageColors, borderWidth: 2 }]
-  }, { ...CHART_DEFAULTS });
 
   document.getElementById('ageing-kpis').innerHTML = ageingTotals.map(r => `
     <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
