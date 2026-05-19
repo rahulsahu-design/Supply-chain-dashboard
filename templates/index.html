@@ -502,6 +502,7 @@
       <!-- Ageing -->
       <div class="card ts-section">
         <div class="ts-section-header ts-header-ageing">⏳ Undelivered Ageing — Transporter × Bucket</div>
+        <div class="kpi-grid" id="ts-ageing-kpis" style="margin:12px 0 4px;"></div>
         <div id="ts-ageing"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
       </div>
 
@@ -1707,6 +1708,7 @@ async function loadTeamSummary() {
     document.getElementById(id).innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
   });
   document.getElementById('ts-del-kpis').innerHTML = skelKpis(2);
+  document.getElementById('ts-ageing-kpis').innerHTML = skelKpis(5);
 
   const delExtra = new URLSearchParams();
   if (channels.length) delExtra.set('channels', channels.join(','));
@@ -1751,6 +1753,15 @@ async function loadTeamSummary() {
   renderPivotTo('ts-del-pivot',   null, _tsDelPivotData);
   renderPivotTo('ts-undel-pivot', null, _tsUndelPivotData);
   renderTATPivotTo('ts-tat-pivot', null, _tsTATData);
+
+  const _tsAgeingTotals = (_tsAgeingRows && _tsAgeingRows.totals) || [];
+  document.getElementById('ts-ageing-kpis').innerHTML = _tsAgeingTotals.map(r => `
+    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
+      <div class="kpi-label">${r.bucket} days</div>
+      <div class="kpi-value">${fmtNum(r.count)}</div>
+      <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
+    </div>`).join('');
+
   renderAgeingTable('ts-ageing', _tsAgeingRows);
 
   const from2 = fromEl.value, to2 = toEl.value;
