@@ -70,13 +70,15 @@ def api_undelivered():
     df = _filtered_df()
     channel_raw = request.args.get("channel", "All")
     exp_del_week_raw = request.args.get("exp_del_week", "All")
+    statuses_raw = request.args.get("statuses", "All")
     date_from = request.args.get("from")
     date_to = request.args.get("to")
     year = request.args.get("undel_year")
     channels = [c.strip() for c in channel_raw.split(",")] if channel_raw and channel_raw != "All" else None
     exp_del_weeks = [w.strip() for w in exp_del_week_raw.split(",")] if exp_del_week_raw and exp_del_week_raw != "All" else None
+    statuses = [s.strip() for s in statuses_raw.split(",")] if statuses_raw and statuses_raw != "All" else None
     return jsonify(d.undelivered_shipments(df, channel=channels, exp_del_week=exp_del_weeks,
-                                           date_from=date_from, date_to=date_to, year=year))
+                                           date_from=date_from, date_to=date_to, year=year, statuses=statuses))
 
 
 @app.route("/api/undelivered-pivot")
@@ -84,13 +86,15 @@ def api_undelivered_pivot():
     df = _filtered_df()
     channels_raw = request.args.get("channels", "All")
     exp_del_weeks_raw = request.args.get("exp_del_weeks", "All")
+    statuses_raw = request.args.get("statuses", "All")
     date_from = request.args.get("from")
     date_to = request.args.get("to")
     year = request.args.get("undel_year")
     channels = [c.strip() for c in channels_raw.split(",")] if channels_raw and channels_raw != "All" else None
     exp_del_weeks = [w.strip() for w in exp_del_weeks_raw.split(",")] if exp_del_weeks_raw and exp_del_weeks_raw != "All" else None
+    statuses = [s.strip() for s in statuses_raw.split(",")] if statuses_raw and statuses_raw != "All" else None
     return jsonify(d.undelivered_pivot(df, channels=channels, exp_del_weeks=exp_del_weeks,
-                                       date_from=date_from, date_to=date_to, year=year))
+                                       date_from=date_from, date_to=date_to, year=year, statuses=statuses))
 
 
 @app.route("/api/raw-data")
@@ -121,13 +125,15 @@ def api_ageing():
     df = _filtered_df()
     channels_raw = request.args.get("channels", "All")
     exp_del_weeks_raw = request.args.get("exp_del_weeks", "All")
+    statuses_raw = request.args.get("statuses", "All")
     date_from = request.args.get("from")
     date_to = request.args.get("to")
     year = request.args.get("undel_year")
     channels = [c.strip() for c in channels_raw.split(",")] if channels_raw and channels_raw != "All" else None
     exp_del_weeks = [w.strip() for w in exp_del_weeks_raw.split(",")] if exp_del_weeks_raw and exp_del_weeks_raw != "All" else None
+    statuses = [s.strip() for s in statuses_raw.split(",")] if statuses_raw and statuses_raw != "All" else None
     return jsonify(d.shipment_ageing(df, channels=channels, exp_del_weeks=exp_del_weeks,
-                                     date_from=date_from, date_to=date_to, year=year))
+                                     date_from=date_from, date_to=date_to, year=year, statuses=statuses))
 
 
 @app.route("/api/scorecard")

@@ -257,6 +257,16 @@
           </div>
         </div>
 
+        <label>Status</label>
+        <div class="ms-dropdown" id="ms-undel-status" data-all-label="All Statuses">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-undel-status')">
+            <span class="ms-label">All Statuses</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel" id="ms-undel-status-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-undel-status',this)" checked> All</label>
+          </div>
+        </div>
+
         <label>Exp Del From</label>
         <input type="date" id="undel-from">
         <label>To</label>
@@ -447,6 +457,15 @@
           </button>
           <div class="ms-panel" id="ms-ts-undel-week-panel">
             <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-ts-undel-week',this)" checked> All</label>
+          </div>
+        </div>
+        <label>Status</label>
+        <div class="ms-dropdown" id="ms-ts-undel-status" data-all-label="All Statuses">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-ts-undel-status')">
+            <span class="ms-label">All Statuses</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel" id="ms-ts-undel-status-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-ts-undel-status',this)" checked> All</label>
           </div>
         </div>
         <label>Exp Del From</label>
@@ -725,6 +744,16 @@ async function loadFilterOptions() {
   const expWeekPanel = document.getElementById('ms-undel-exp-week-panel');
   (opts.exp_del_weeks || []).forEach(w => {
     expWeekPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${w}" onchange="msItemToggle('ms-undel-exp-week',this)"> W${w}</label>`;
+  });
+
+  // Populate undelivered status multi-selects (both tabs)
+  const undelStatusPanel   = document.getElementById('ms-undel-status-panel');
+  const tsUndelStatusPanel = document.getElementById('ms-ts-undel-status-panel');
+  (opts.undel_statuses || []).forEach(s => {
+    const opt = `<label class="ms-option"><input type="checkbox" value="${s}" onchange="msItemToggle('ms-undel-status',this)"> ${s}</label>`;
+    const tsOpt = `<label class="ms-option"><input type="checkbox" value="${s}" onchange="msItemToggle('ms-ts-undel-status',this)"> ${s}</label>`;
+    undelStatusPanel.innerHTML += opt;
+    tsUndelStatusPanel.innerHTML += tsOpt;
   });
 
   // Populate delivered year dropdown
@@ -1311,6 +1340,7 @@ async function loadUndelivered() {
   document.getElementById('undel-pivot-wrap').innerHTML = skelTable();
   const channels    = getMsValues('ms-undel-channel');
   const expDelWeeks = getMsValues('ms-undel-exp-week');
+  const statuses    = getMsValues('ms-undel-status');
   const from  = document.getElementById('undel-from').value;
   const to    = document.getElementById('undel-to').value;
   const year  = document.getElementById('undel-year').value;
@@ -1318,6 +1348,7 @@ async function loadUndelivered() {
   const extra = new URLSearchParams();
   if (channels.length)    extra.set('channel', channels.join(','));
   if (expDelWeeks.length) extra.set('exp_del_week', expDelWeeks.join(','));
+  if (statuses.length)    extra.set('statuses', statuses.join(','));
   if (from) extra.set('from', from);
   if (to)   extra.set('to', to);
   if (year && year !== 'All') extra.set('undel_year', year);
@@ -1325,6 +1356,7 @@ async function loadUndelivered() {
   const pivotExtra = new URLSearchParams();
   if (channels.length)    pivotExtra.set('channels', channels.join(','));
   if (expDelWeeks.length) pivotExtra.set('exp_del_weeks', expDelWeeks.join(','));
+  if (statuses.length)    pivotExtra.set('statuses', statuses.join(','));
   if (from) pivotExtra.set('from', from);
   if (to)   pivotExtra.set('to', to);
   if (year && year !== 'All') pivotExtra.set('undel_year', year);
@@ -1385,7 +1417,7 @@ async function loadUndelivered() {
 }
 
 function clearUndeliveredFilters() {
-  ['ms-undel-channel', 'ms-undel-exp-week'].forEach(id => {
+  ['ms-undel-channel', 'ms-undel-exp-week', 'ms-undel-status'].forEach(id => {
     const el = document.getElementById(id);
     el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
     const allCb = el.querySelector('input[value="__all__"]');
@@ -1668,6 +1700,7 @@ async function loadTeamSummary() {
   // Row 2 filter values (Pending & Ageing)
   const undelChannels  = getMsValues('ms-ts-undel-channel');
   const undelExpWeeks  = getMsValues('ms-ts-undel-week');
+  const undelStatuses  = getMsValues('ms-ts-undel-status');
   const undelYear      = document.getElementById('ts-undel-year').value;
   const undelFrom      = document.getElementById('ts-undel-from').value;
   const undelTo        = document.getElementById('ts-undel-to').value;
@@ -1686,6 +1719,7 @@ async function loadTeamSummary() {
   const undelExtra = new URLSearchParams();
   if (undelChannels.length)  undelExtra.set('channels',    undelChannels.join(','));
   if (undelExpWeeks.length)  undelExtra.set('exp_del_weeks', undelExpWeeks.join(','));
+  if (undelStatuses.length)  undelExtra.set('statuses',    undelStatuses.join(','));
   if (undelYear && undelYear !== 'All') undelExtra.set('undel_year', undelYear);
   if (undelFrom) undelExtra.set('from', undelFrom);
   if (undelTo)   undelExtra.set('to',   undelTo);
@@ -1754,7 +1788,7 @@ function clearTeamSummaryFilters() {
 }
 
 function clearTsUndelFilters() {
-  ['ms-ts-undel-channel', 'ms-ts-undel-week'].forEach(id => {
+  ['ms-ts-undel-channel', 'ms-ts-undel-week', 'ms-ts-undel-status'].forEach(id => {
     const el = document.getElementById(id);
     el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
     const allCb = el.querySelector('input[value="__all__"]');

@@ -203,12 +203,18 @@ def get_filter_options(df: pd.DataFrame) -> dict:
             max_del_date = mx.strftime("%Y-%m-%d")
         del_years = sorted(df["Actual Delivery Date"].dropna().dt.year.unique().astype(int).tolist())
 
+    undel_statuses = []
+    if STATUS_COL in df.columns:
+        mask = _active_undelivered_mask(df)
+        undel_statuses = sorted(df[mask][STATUS_COL].str.strip().dropna().replace("", pd.NA).dropna().unique().tolist())
+
     return {
         "years": years, "months": months, "weeks": weeks, "del_weeks": del_weeks,
         "del_years": [str(y) for y in del_years],
         "exp_del_weeks": exp_del_weeks,
         "exp_del_years": [str(y) for y in exp_del_years],
         "max_delivery_date": max_del_date,
+        "undel_statuses": undel_statuses,
     }
 
 
@@ -445,7 +451,7 @@ def delivered_pivot(df: pd.DataFrame, channels=None, del_weeks=None, date_from=N
 
 
 def undelivered_shipments(df: pd.DataFrame, channel=None, exp_del_week=None,
-                          date_from=None, date_to=None, year=None) -> list:
+                          date_from=None, date_to=None, year=None, statuses=None) -> list:
     d = df[_active_undelivered_mask(df)].copy()
     if year and year != "All":
         try:
@@ -459,6 +465,8 @@ def undelivered_shipments(df: pd.DataFrame, channel=None, exp_del_week=None,
         d = d[d["Expected Delivery Date"].dt.date >= pd.to_datetime(date_from).date()]
     if date_to:
         d = d[d["Expected Delivery Date"].dt.date <= pd.to_datetime(date_to).date()]
+    if statuses and STATUS_COL in d.columns:
+        d = d[d[STATUS_COL].str.strip().isin(statuses)]
     cols = [
         "Shipment AWB", "Channel", "Transporter", "Pick up Date",
         "Expected Delivery Date", "Ageing", "Ageing Bucket",
@@ -475,7 +483,7 @@ def undelivered_shipments(df: pd.DataFrame, channel=None, exp_del_week=None,
 
 
 def undelivered_pivot(df: pd.DataFrame, channels=None, exp_del_weeks=None,
-                      date_from=None, date_to=None, year=None) -> dict:
+                      date_from=None, date_to=None, year=None, statuses=None) -> dict:
     mask = _active_undelivered_mask(df)
     d = df[mask & df["Expected Delivery Date"].notna() & df["Qty Sent"].notna()].copy()
     if year and year != "All":
@@ -490,6 +498,8 @@ def undelivered_pivot(df: pd.DataFrame, channels=None, exp_del_weeks=None,
         d = d[d["Expected Delivery Date"].dt.date >= pd.to_datetime(date_from).date()]
     if date_to:
         d = d[d["Expected Delivery Date"].dt.date <= pd.to_datetime(date_to).date()]
+    if statuses and STATUS_COL in d.columns:
+        d = d[d[STATUS_COL].str.strip().isin(statuses)]
 
     if d.empty:
         return {"dates": [], "rows": [], "grand_totals": {}, "overall_total": 0}
@@ -647,7 +657,7 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
 
 
 def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
-                    date_from=None, date_to=None, year=None) -> dict:
+                    date_from=None, date_to=None, year=None, statuses=None) -> dict:
     bucket_order = ["0-5", "6-10", "11-20", "21-30", "30+"]
     _EXCLUDE = {"Delivered", "RTO", "Abandon", "RTS"}
     status = df[STATUS_COL].str.strip()
@@ -665,6 +675,8 @@ def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
         d = d[d["Expected Delivery Date"].dt.date >= pd.to_datetime(date_from).date()]
     if date_to and "Expected Delivery Date" in d.columns:
         d = d[d["Expected Delivery Date"].dt.date <= pd.to_datetime(date_to).date()]
+    if statuses and STATUS_COL in d.columns:
+        d = d[d[STATUS_COL].str.strip().isin(statuses)]
 
     def _units(sub):
         return int(sub["Qty Sent"].fillna(0).sum()) if "Qty Sent" in sub.columns else 0
