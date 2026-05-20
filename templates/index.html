@@ -492,6 +492,7 @@
       <!-- Pending Shipments Pivot -->
       <div class="card ts-section">
         <div class="ts-section-header ts-header-undel">🚚 Pending Shipments — Channel × Exp Delivery</div>
+        <div class="kpi-grid" id="ts-undel-kpis" style="margin:12px 0 4px;"></div>
         <div id="ts-undel-pivot"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>
       </div>
 
@@ -1709,6 +1710,7 @@ async function loadTeamSummary() {
     document.getElementById(id).innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
   });
   document.getElementById('ts-del-kpis').innerHTML = skelKpis(2);
+  document.getElementById('ts-undel-kpis').innerHTML = skelKpis(4);
   document.getElementById('ts-ageing-kpis').innerHTML = skelKpis(5);
 
   const delExtra = new URLSearchParams();
@@ -1724,22 +1726,33 @@ async function loadTeamSummary() {
   if (undelFrom) undelExtra.set('from', undelFrom);
   if (undelTo)   undelExtra.set('to',   undelTo);
 
+  // /api/undelivered uses singular param names
+  const undelListExtra = new URLSearchParams();
+  if (undelChannels.length)  undelListExtra.set('channel',      undelChannels.join(','));
+  if (undelExpWeeks.length)  undelListExtra.set('exp_del_week', undelExpWeeks.join(','));
+  if (undelStatuses.length)  undelListExtra.set('statuses',     undelStatuses.join(','));
+  if (undelYear && undelYear !== 'All') undelListExtra.set('undel_year', undelYear);
+  if (undelFrom) undelListExtra.set('from', undelFrom);
+  if (undelTo)   undelListExtra.set('to',   undelTo);
+
   const tatExtra = new URLSearchParams();
   if (channels.length) tatExtra.set('channels', channels.join(','));
   if (from) tatExtra.set('from', from);
   if (to)   tatExtra.set('to', to);
 
-  const [delRes, undelRes, tatRes, ageingRes] = await Promise.all([
+  const [delRes, undelRes, tatRes, ageingRes, undelListRes] = await Promise.all([
     apiFetch('/api/delivered-pivot', delExtra),
     apiFetch('/api/undelivered-pivot', undelExtra),
     apiFetch('/api/tat-pivot', tatExtra),
     apiFetch('/api/ageing', undelExtra),
+    apiFetch('/api/undelivered', undelListExtra),
   ]);
 
   _tsDelPivotData   = await delRes.json();
   _tsUndelPivotData = await undelRes.json();
   _tsTATData        = await tatRes.json();
   _tsAgeingRows     = await ageingRes.json();
+  const _tsUndelRows = await undelListRes.json();
 
   const _tatOverall = (_tsTATData && _tsTATData.overall) || {};
   document.getElementById('ts-del-kpis').innerHTML = `
@@ -1753,6 +1766,28 @@ async function loadTeamSummary() {
     </div>`;
 
   renderPivotTo('ts-del-pivot',   null, _tsDelPivotData);
+
+  const _tsByChannel = {};
+  let _tsTotalQty = 0;
+  (_tsUndelRows || []).forEach(r => {
+    _tsByChannel[r.Channel] = (_tsByChannel[r.Channel] || 0) + 1;
+    _tsTotalQty += Number(r['Qty Sent']) || 0;
+  });
+  document.getElementById('ts-undel-kpis').innerHTML = `
+    <div class="kpi-card accent-blue">
+      <div class="kpi-label">Total Pending Shipments</div>
+      <div class="kpi-value">${fmtNum((_tsUndelRows || []).length)}</div>
+    </div>
+    <div class="kpi-card accent-orange">
+      <div class="kpi-label">Total Pending Units</div>
+      <div class="kpi-value">${fmtNum(_tsTotalQty)}</div>
+    </div>
+    ${Object.entries(_tsByChannel).map(([ch, cnt]) => `
+    <div class="kpi-card">
+      <div class="kpi-label">${ch}</div>
+      <div class="kpi-value">${fmtNum(cnt)}</div>
+    </div>`).join('')}`;
+
   renderPivotTo('ts-undel-pivot', null, _tsUndelPivotData);
   renderTATPivotTo('ts-tat-pivot', null, _tsTATData);
 
