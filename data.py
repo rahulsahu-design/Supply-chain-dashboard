@@ -93,13 +93,18 @@ def _do_fetch():
         if col in df.columns:
             raw = df[col].astype(str).str.strip()
             df[f"_raw_{col}"] = raw
-            parsed = pd.to_datetime(raw, dayfirst=True, errors="coerce")
-            # pandas 2.x no longer falls back when dayfirst parse fails (e.g. "5/20/2026")
-            # retry those rows with dayfirst=False so M/D/Y format is also handled
+            # Primary: explicit DD-MM-YYYY format (sheet's actual format)
+            parsed = pd.to_datetime(raw, format="%d-%m-%Y", errors="coerce")
+            # Fallback 1: general parser dayfirst=True (handles other separators)
             failed = parsed.isna() & raw.ne("") & raw.ne("nan")
             if failed.any():
-                parsed2 = pd.to_datetime(raw[failed], dayfirst=False, errors="coerce")
+                parsed2 = pd.to_datetime(raw[failed], dayfirst=True, errors="coerce")
                 parsed[failed] = parsed2
+            # Fallback 2: dayfirst=False for M/D/Y style
+            failed = parsed.isna() & raw.ne("") & raw.ne("nan")
+            if failed.any():
+                parsed3 = pd.to_datetime(raw[failed], dayfirst=False, errors="coerce")
+                parsed[failed] = parsed3
             df[col] = parsed
 
     for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent"]:
