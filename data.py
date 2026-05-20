@@ -683,8 +683,8 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
 def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
                     date_from=None, date_to=None, year=None, statuses=None) -> dict:
     _all_buckets = ["0-5", "6-10", "11-20", "21-30", "30+", "31-40", "40+"]
-    if "Ageing Bucket" in d.columns:
-        _present = set(d["Ageing Bucket"].str.strip().dropna().unique())
+    if "Ageing Bucket" in df.columns:
+        _present = set(df["Ageing Bucket"].str.strip().dropna().unique())
         bucket_order = [b for b in _all_buckets if b in _present] or _all_buckets[:5]
     else:
         bucket_order = _all_buckets[:5]
