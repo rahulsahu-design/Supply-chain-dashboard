@@ -1766,6 +1766,7 @@ async function loadTeamSummary() {
     <div class="kpi-card accent-blue">
       <div class="kpi-label">Overall Avg TAT</div>
       <div class="kpi-value">${fmtFloat(_tatOverall.avg_tat)}<span style="font-size:16px;font-weight:600;margin-left:4px;">days</span></div>
+      ${_delDateLine ? `<div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${_delDateLine}</div>` : ''}
     </div>`;
 
   renderPivotTo('ts-del-pivot',   null, _tsDelPivotData);
@@ -1897,16 +1898,20 @@ function openSummaryModal() {
   const toVal   = document.getElementById('ts-to').value;
   const periodText = (fromVal && toVal) ? `${fromVal} to ${toVal}`
     : fromVal ? `from ${fromVal}` : 'the selected period';
+  const _mFmt = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]} ${y}`; };
+  const _chipDateLine = (fromVal && toVal) ? `${_mFmt(fromVal)} → ${_mFmt(toVal)}` : fromVal ? `From ${_mFmt(fromVal)}` : '';
 
   // ── KPI strip ────────────────────────────────────────────────────────────
   document.getElementById('ts-kpi-strip').innerHTML = `
     <div class="ts-kpi-chip chip-green">
       <div class="ts-kpi-chip-val">${fmtNum(delUnits)}</div>
       <div class="ts-kpi-chip-label">Units Delivered</div>
+      ${_chipDateLine ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:6px;font-weight:500;">${_chipDateLine}</div>` : ''}
     </div>
     <div class="ts-kpi-chip chip-blue">
       <div class="ts-kpi-chip-val">${avgTAT != null ? avgTAT + 'd' : '—'}</div>
       <div class="ts-kpi-chip-label">Avg TAT</div>
+      ${_chipDateLine ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:6px;font-weight:500;">${_chipDateLine}</div>` : ''}
     </div>
     <div class="ts-kpi-chip chip-amber">
       <div class="ts-kpi-chip-val">${fmtNum(undelUnits)}</div>
