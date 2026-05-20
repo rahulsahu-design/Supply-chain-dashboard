@@ -1755,10 +1755,13 @@ async function loadTeamSummary() {
   const _tsUndelRows = await undelListRes.json();
 
   const _tatOverall = (_tsTATData && _tsTATData.overall) || {};
+  const _fmtD = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${+d} ${mon} ${y}`; };
+  const _delDateLine = (from && to) ? `${_fmtD(from)} → ${_fmtD(to)}` : from ? `From ${_fmtD(from)}` : '';
   document.getElementById('ts-del-kpis').innerHTML = `
     <div class="kpi-card accent-green">
       <div class="kpi-label">Total Deliveries</div>
       <div class="kpi-value">${fmtNum(_tatOverall.count)}</div>
+      ${_delDateLine ? `<div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${_delDateLine}</div>` : ''}
     </div>
     <div class="kpi-card accent-blue">
       <div class="kpi-label">Overall Avg TAT</div>
