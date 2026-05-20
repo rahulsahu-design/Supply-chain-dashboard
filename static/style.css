@@ -1062,7 +1062,7 @@ tbody tr.overdue td { color: var(--accent-red); }
 /* ── Ageing KPI cards in modal ── */
 #ts-modal-ageing-kpis {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
   padding: 14px 16px;
   background: #0d1117;

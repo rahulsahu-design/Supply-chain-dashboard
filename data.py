@@ -18,7 +18,7 @@ SCOPES = [
 
 STATUS_COL = "Current Status - Ship partner portal"
 DELIVERED_STATUSES = {"Delivered"}
-OVERDUE_BUCKETS = {"21-30", "30+"}
+OVERDUE_BUCKETS = {"21-30", "30+", "31-40", "40+"}
 EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "Abandon"}
 XINDUS = "Xindus Air + Sea"
 PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
@@ -91,6 +91,7 @@ def _do_fetch():
     date_cols = ["Pick up Date", "Actual Delivery Date", "Expected Delivery Date"]
     for col in date_cols:
         if col in df.columns:
+            df[f"_raw_{col}"] = df[col].astype(str).str.strip()
             df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
 
     for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent"]:
@@ -633,7 +634,17 @@ def raw_data_2026(df: pd.DataFrame) -> dict:
     out = d[cols].copy()
     for dc in ["Pick up Date", "Expected Delivery Date", "Actual Delivery Date"]:
         if dc in out.columns:
-            out[dc] = out[dc].apply(lambda x: x.strftime("%d/%m/%Y") if pd.notna(x) else "")
+            raw_col = f"_raw_{dc}"
+            if raw_col in d.columns:
+                parsed = out[dc]
+                raw_strs = d.loc[out.index, raw_col]
+                out[dc] = [
+                    v.strftime("%d/%m/%Y") if pd.notna(v)
+                    else (r if r and r not in ('', 'nan', 'NaT', 'None') else "")
+                    for v, r in zip(parsed, raw_strs)
+                ]
+            else:
+                out[dc] = out[dc].apply(lambda x: x.strftime("%d/%m/%Y") if pd.notna(x) else "")
     out = out.fillna("").astype(str).replace("nan", "").replace("<NA>", "")
     return {"columns": cols, "rows": out.to_dict(orient="records"), "total": len(out)}
 
@@ -658,7 +669,7 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
 
 def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
                     date_from=None, date_to=None, year=None, statuses=None) -> dict:
-    bucket_order = ["0-5", "6-10", "11-20", "21-30", "30+"]
+    bucket_order = ["0-5", "6-10", "11-20", "21-30", "31-40", "40+"]
     _EXCLUDE = {"Delivered", "RTO", "Abandon", "RTS"}
     status = df[STATUS_COL].str.strip()
     d = df[status.notna() & (status != "") & ~status.isin(_EXCLUDE)].copy()

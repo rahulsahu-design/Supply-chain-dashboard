@@ -903,7 +903,7 @@ function statusBadge(s) {
   return `<span class="badge ${cls}">${s || '—'}</span>`;
 }
 function bucketBadge(b) {
-  const cls = (b === '21-30' || b === '30+') ? 'badge-red'
+  const cls = (b === '21-30' || b === '30+' || b === '31-40' || b === '40+') ? 'badge-red'
     : b === '11-20' ? 'badge-orange' : 'badge-blue';
   return `<span class="badge ${cls}">${b || '—'}</span>`;
 }
@@ -1408,7 +1408,7 @@ async function loadUndelivered() {
   const ageingTotals = ageingData.totals || [];
 
   document.getElementById('ageing-kpis').innerHTML = ageingTotals.map(r => `
-    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
+    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' || r.bucket === '31-40' || r.bucket === '40+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
       <div class="kpi-label">${r.bucket} days</div>
       <div class="kpi-value">${fmtNum(r.count)}</div>
       <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
@@ -1502,7 +1502,7 @@ function renderAgeingTable(wrapId, data) {
   const totals   = data.totals   || [];
   if (!buckets.length) { wrap.innerHTML = '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>'; return; }
 
-  const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a' };
+  const BUCKET_COLORS = { '0-5':'#38a169', '6-10':'#4f8ef7', '11-20':'#dd6b20', '21-30':'#e53e3e', '30+':'#742a2a', '31-40':'#c53030', '40+':'#63171b' };
 
   let html = '<table class="pivot-table"><thead><tr>';
   html += '<th style="text-align:left;min-width:160px;">Transporter</th>';
@@ -1711,7 +1711,7 @@ async function loadTeamSummary() {
   });
   document.getElementById('ts-del-kpis').innerHTML = skelKpis(2);
   document.getElementById('ts-undel-kpis').innerHTML = skelKpis(4);
-  document.getElementById('ts-ageing-kpis').innerHTML = skelKpis(5);
+  document.getElementById('ts-ageing-kpis').innerHTML = skelKpis(6);
 
   const delExtra = new URLSearchParams();
   if (channels.length) delExtra.set('channels', channels.join(','));
@@ -1797,7 +1797,7 @@ async function loadTeamSummary() {
 
   const _tsAgeingTotals = (_tsAgeingRows && _tsAgeingRows.totals) || [];
   document.getElementById('ts-ageing-kpis').innerHTML = _tsAgeingTotals.map(r => `
-    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
+    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' || r.bucket === '31-40' || r.bucket === '40+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
       <div class="kpi-label">${r.bucket} days</div>
       <div class="kpi-value">${fmtNum(r.count)}</div>
       <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
@@ -1870,7 +1870,7 @@ function openSummaryModal() {
 
   let overdueUnits = 0;
   (ageingData.totals || []).forEach(b => {
-    if (b.bucket === '21-30' || b.bucket === '30+') overdueUnits += (b.units || 0);
+    if (b.bucket === '21-30' || b.bucket === '30+' || b.bucket === '31-40' || b.bucket === '40+') overdueUnits += (b.units || 0);
   });
 
   // Top delivering channel
@@ -1889,7 +1889,9 @@ function openSummaryModal() {
   let worstT = '', worstTUnits = 0;
   (ageingData.rows || []).forEach(r => {
     const u = ((r.cells && r.cells['21-30'] ? r.cells['21-30'].units : 0) +
-               (r.cells && r.cells['30+']   ? r.cells['30+'].units   : 0));
+               (r.cells && r.cells['30+']   ? r.cells['30+'].units   : 0) +
+               (r.cells && r.cells['31-40'] ? r.cells['31-40'].units : 0) +
+               (r.cells && r.cells['40+']   ? r.cells['40+'].units   : 0));
     if (u > worstTUnits) { worstTUnits = u; worstT = r.transporter; }
   });
 
