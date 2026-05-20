@@ -91,8 +91,16 @@ def _do_fetch():
     date_cols = ["Pick up Date", "Actual Delivery Date", "Expected Delivery Date"]
     for col in date_cols:
         if col in df.columns:
-            df[f"_raw_{col}"] = df[col].astype(str).str.strip()
-            df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
+            raw = df[col].astype(str).str.strip()
+            df[f"_raw_{col}"] = raw
+            parsed = pd.to_datetime(raw, dayfirst=True, errors="coerce")
+            # pandas 2.x no longer falls back when dayfirst parse fails (e.g. "5/20/2026")
+            # retry those rows with dayfirst=False so M/D/Y format is also handled
+            failed = parsed.isna() & raw.ne("") & raw.ne("nan")
+            if failed.any():
+                parsed2 = pd.to_datetime(raw[failed], dayfirst=False, errors="coerce")
+                parsed[failed] = parsed2
+            df[col] = parsed
 
     for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent"]:
         if col in df.columns:
@@ -669,7 +677,12 @@ def tat_analysis(df: pd.DataFrame, days=7) -> list:
 
 def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
                     date_from=None, date_to=None, year=None, statuses=None) -> dict:
-    bucket_order = ["0-5", "6-10", "11-20", "21-30", "31-40", "40+"]
+    _all_buckets = ["0-5", "6-10", "11-20", "21-30", "30+", "31-40", "40+"]
+    if "Ageing Bucket" in d.columns:
+        _present = set(d["Ageing Bucket"].str.strip().dropna().unique())
+        bucket_order = [b for b in _all_buckets if b in _present] or _all_buckets[:5]
+    else:
+        bucket_order = _all_buckets[:5]
     _EXCLUDE = {"Delivered", "RTO", "Abandon", "RTS"}
     status = df[STATUS_COL].str.strip()
     d = df[status.notna() & (status != "") & ~status.isin(_EXCLUDE)].copy()
