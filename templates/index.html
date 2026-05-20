@@ -1915,13 +1915,13 @@ function openSummaryModal() {
       <div class="ts-kpi-chip-label">Avg TAT</div>
       ${_chipDateLine ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:6px;font-weight:500;">${_chipDateLine}</div>` : ''}
     </div>
+    <div class="ts-kpi-chip chip-blue">
+      <div class="ts-kpi-chip-val">${fmtNum(pendingShipments)}</div>
+      <div class="ts-kpi-chip-label">Pending Shipments</div>
+    </div>
     <div class="ts-kpi-chip chip-amber">
       <div class="ts-kpi-chip-val">${fmtNum(undelUnits)}</div>
       <div class="ts-kpi-chip-label">Pending Units</div>
-    </div>
-    <div class="ts-kpi-chip chip-red">
-      <div class="ts-kpi-chip-val">${fmtNum(overdueUnits)}</div>
-      <div class="ts-kpi-chip-label">Overdue 21d+</div>
     </div>`;
 
   // ── Narrative summary ────────────────────────────────────────────────────
