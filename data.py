@@ -771,9 +771,20 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
 def monthly_deliveries(df: pd.DataFrame) -> list:
     MONTHS = ["January","February","March","April","May","June",
               "July","August","September","October","November","December"]
+    # Derive month from pickup date for rows where Month column is blank
+    if "Pick up Date" in df.columns:
+        derived = df["Pick up Date"].dt.month.map(
+            lambda n: MONTHS[int(n)-1] if pd.notna(n) else None
+        )
+        month_col = df["Month"].astype(str).str.strip().replace("", pd.NA).replace("nan", pd.NA)
+        df = df.copy()
+        df["_month_eff"] = month_col.combine_first(derived)
+    else:
+        df = df.copy()
+        df["_month_eff"] = df["Month"].astype(str).str.strip()
     result = []
     for m in MONTHS:
-        mdf = df[df["Month"].astype(str).str.strip() == m]
+        mdf = df[df["_month_eff"] == m]
         if not len(mdf):
             continue
         del_df   = mdf[mdf["is_delivered"]]

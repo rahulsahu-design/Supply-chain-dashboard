@@ -2002,7 +2002,18 @@ function renderRawRows() {
     const DONE = new Set(['Delivered', 'RTO', 'Abandon']);
     if (_rawNavFilter.statusGroup === 'undelivered') rows = rows.filter(r => !DONE.has(r[STATUS_KEY]));
     if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
-    if (_rawNavFilter.month) rows = rows.filter(r => String(r['Month']||'').trim() === _rawNavFilter.month);
+    if (_rawNavFilter.month) {
+      const _MLIST = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const _mIdx = _MLIST.indexOf(_rawNavFilter.month) + 1; // 1-based
+      rows = rows.filter(r => {
+        // Try Month column first (may be empty for 2026 rows)
+        const mc = String(r['Month']||'').trim();
+        if (mc === _rawNavFilter.month) return true;
+        // Fallback: parse pickup date "dd/mm/yyyy"
+        const parts = (r['Pick up Date']||'').split('/');
+        return parts.length >= 2 && parseInt(parts[1]) === _mIdx;
+      });
+    }
   }
   if (search) rows = rows.filter(r => _rawCols.some(c => String(r[c]||'').toLowerCase().includes(search)));
   if (_rawSort.col >= 0) {
