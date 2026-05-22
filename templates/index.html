@@ -110,12 +110,12 @@
       <div class="kpi-grid" id="summary-kpis">
         <div class="loading-state"><div class="spinner"></div> Loading…</div>
       </div>
-      <div style="display:flex;gap:20px;margin-bottom:20px;align-items:flex-start;">
+      <div style="display:flex;gap:20px;margin-bottom:20px;align-items:stretch;">
         <div class="card" style="flex:0 0 440px;">
           <h3>Status Breakdown</h3>
           <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
         </div>
-        <div class="card" style="flex:1;padding:0;overflow:hidden;">
+        <div class="card" style="flex:1;padding:0;overflow:hidden;display:flex;flex-direction:column;">
           <div style="padding:8px 14px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Tonnage Summary</span>
             <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
@@ -130,7 +130,7 @@
               <button class="btn btn-primary" onclick="loadDailyTonnage()" style="font-size:11px;padding:4px 12px;">Apply</button>
             </div>
           </div>
-          <div id="daily-tonnage-table" style="overflow-x:auto;">
+          <div id="daily-tonnage-table" style="overflow-x:auto;flex:1;">
             <div class="loading-state"><div class="spinner"></div> Loading…</div>
           </div>
         </div>
