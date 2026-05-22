@@ -637,11 +637,7 @@ def raw_data_2026(df: pd.DataFrame) -> dict:
         "Ageing", "Ageing Bucket", STATUS_COL, "Qty Sent",
         "Year", "Month", "Week",
     ]
-    try:
-        cleaned = pd.to_numeric(df["Year"].astype(str).str.strip().str.replace(',', '', regex=False), errors='coerce')
-        d = df[cleaned == 2026].copy()
-    except Exception:
-        d = df[df["Year"].astype(str).str.strip() == "2026"].copy()
+    d = df.copy()
 
     cols = [c for c in RAW_COLS if c in d.columns]
     out = d[cols].copy()
