@@ -1171,8 +1171,10 @@ async function loadSummary() {
     }
   }});
 
-  // MoM deliveries chart
-  const momRes = await apiFetch('/api/monthly-deliveries');
+  // MoM deliveries chart — default to current year so data aligns with raw_data_2026
+  const _momExtra = new URLSearchParams();
+  if (!document.getElementById('gf-year').value) _momExtra.set('year', String(new Date().getFullYear()));
+  const momRes = await apiFetch('/api/monthly-deliveries', _momExtra);
   _momData = await momRes.json();
   if (_momData.length) {
     // Populate month dropdown (reset each load)
