@@ -1140,8 +1140,9 @@ async function loadSummary() {
               if (ctx.datasetIndex === 0) {
                 _momTip.innerHTML = `<div style="font-weight:700;color:#4ade80;">${row.month} · Delivered: ${fmtNum(row.delivered_units)} units</div>`;
                 _momTip.style.display = 'block';
-                _momTip.style.left = (ne.clientX + 14) + 'px';
-                _momTip.style.top  = (ne.clientY - 10) + 'px';
+                { const tw=_momTip.offsetWidth,th=_momTip.offsetHeight;
+                  _momTip.style.left=(ne.clientX+14+tw>window.innerWidth-8?ne.clientX-tw-14:ne.clientX+14)+'px';
+                  _momTip.style.top =(ne.clientY-10+th>window.innerHeight-8?ne.clientY-th:ne.clientY-10)+'px'; }
                 return;
               }
               // Undelivered label: status breakdown + click hint
@@ -1153,8 +1154,9 @@ async function loadSummary() {
               html += `<div style="margin-top:8px;font-size:10px;color:#fb923c;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">↗ Click number to view in Raw Data</div>`;
               _momTip.innerHTML = html;
               _momTip.style.display = 'block';
-              _momTip.style.left = (ne.clientX + 14) + 'px';
-              _momTip.style.top  = (ne.clientY - 10) + 'px';
+              { const tw=_momTip.offsetWidth,th=_momTip.offsetHeight;
+                _momTip.style.left=(ne.clientX+14+tw>window.innerWidth-8?ne.clientX-tw-14:ne.clientX+14)+'px';
+                _momTip.style.top =(ne.clientY-10+th>window.innerHeight-8?ne.clientY-th:ne.clientY-10)+'px'; }
               ne.target.style.cursor = 'pointer';
             },
             leave(ctx, evt) {
