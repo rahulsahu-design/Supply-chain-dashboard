@@ -1133,12 +1133,17 @@ async function loadDailyTonnage() {
     return;
   }
   const tTotalShipments = tRows.reduce((s, r) => s + r.shipments, 0);
+  const tTotalDelivered = tRows.reduce((s, r) => s + r.delivered, 0);
   const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
   const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
   const tTotalBoxes     = tRows.reduce((s, r) => s + r.boxes, 0);
+  const _otBadge = pct => pct == null ? '—'
+    : `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(pct)}%</span>`;
   let th = `<table class="pivot-table"><thead><tr>
     <th>Month</th>
     <th style="text-align:right;">Shipments</th>
+    <th style="text-align:right;">Delivered</th>
+    <th style="text-align:right;">On Time %</th>
     <th style="text-align:right;">Vol. Wt (kg)</th>
     <th style="text-align:right;">Units</th>
     <th style="text-align:right;">Boxes</th>
@@ -1147,6 +1152,8 @@ async function loadDailyTonnage() {
     th += `<tr>
       <td><strong>${r.month}</strong></td>
       <td style="text-align:right;">${fmtNum(r.shipments)}</td>
+      <td style="text-align:right;">${fmtNum(r.delivered)}</td>
+      <td style="text-align:right;">${_otBadge(r.on_time_pct)}</td>
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
       <td style="text-align:right;">${fmtNum(r.boxes)}</td>
@@ -1155,6 +1162,8 @@ async function loadDailyTonnage() {
   th += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
     <td>Total</td>
     <td style="text-align:right;">${fmtNum(tTotalShipments)}</td>
+    <td style="text-align:right;">${fmtNum(tTotalDelivered)}</td>
+    <td style="text-align:right;">—</td>
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
     <td style="text-align:right;">${fmtNum(tTotalBoxes)}</td>

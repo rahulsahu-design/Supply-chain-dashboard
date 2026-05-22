@@ -795,9 +795,15 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
         mdf = d[d["Month"].astype(str).str.strip() == m]
         if len(mdf) == 0:
             continue
+        delivered = int(mdf["is_delivered"].sum())
+        del_df = mdf[mdf["is_delivered"] & mdf["Delay Days"].notna()]
+        tat_count = len(del_df)
+        on_time_pct = round(float((del_df["Delay Days"] <= 0).sum()) / tat_count * 100, 1) if tat_count > 0 else None
         rows.append({
             "month": m[:3],
             "shipments": len(mdf),
+            "delivered": delivered,
+            "on_time_pct": on_time_pct,
             "vol_wt": round(float(mdf["Vol. Wt"].fillna(0).sum()), 1) if "Vol. Wt" in mdf.columns else 0,
             "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
             "boxes": int(mdf["No. Of box"].fillna(0).sum()) if "No. Of box" in mdf.columns else 0,
