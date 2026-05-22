@@ -797,6 +797,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
             continue
         rows.append({
             "month": m[:3],
+            "shipments": len(mdf),
             "vol_wt": round(float(mdf["Vol. Wt"].fillna(0).sum()), 1) if "Vol. Wt" in mdf.columns else 0,
             "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
             "boxes": int(mdf["No. Of box"].fillna(0).sum()) if "No. Of box" in mdf.columns else 0,

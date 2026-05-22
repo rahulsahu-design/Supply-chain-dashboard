@@ -1735,8 +1735,9 @@ async function loadTonnage() {
     getChart('chart-tonnage-units', 'bar', {
       labels: rows.map(r => r.month),
       datasets: [
-        { label: 'Units', data: rows.map(r => r.units), backgroundColor: '#38a169' },
-        { label: 'Boxes', data: rows.map(r => r.boxes), backgroundColor: '#d69e2e' },
+        { label: 'Shipments', data: rows.map(r => r.shipments), backgroundColor: '#4f8ef7' },
+        { label: 'Units',     data: rows.map(r => r.units),     backgroundColor: '#38a169' },
+        { label: 'Boxes',     data: rows.map(r => r.boxes),     backgroundColor: '#d69e2e' },
       ]
     }, { ...CHART_DEFAULTS, scales: { x: { stacked: false, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } });
   }
@@ -1746,11 +1747,13 @@ async function loadTonnage() {
     document.getElementById('tonnage-table-wrap').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-400);">No data for selected filters</div>';
     return;
   }
+  const totalShipments = rows.reduce((s, r) => s + r.shipments, 0);
   const totalVolWt = rows.reduce((s, r) => s + r.vol_wt, 0);
   const totalUnits = rows.reduce((s, r) => s + r.units, 0);
   const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
   let html = `<table class="pivot-table"><thead><tr>
     <th>Month</th>
+    <th style="text-align:right;">Shipments</th>
     <th style="text-align:right;">Vol. Weight (kg)</th>
     <th style="text-align:right;">Units</th>
     <th style="text-align:right;">Boxes</th>
@@ -1758,6 +1761,7 @@ async function loadTonnage() {
   rows.forEach(r => {
     html += `<tr>
       <td><strong>${r.month}</strong></td>
+      <td style="text-align:right;">${fmtNum(r.shipments)}</td>
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
       <td style="text-align:right;">${fmtNum(r.boxes)}</td>
@@ -1765,6 +1769,7 @@ async function loadTonnage() {
   });
   html += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
     <td>Total</td>
+    <td style="text-align:right;">${fmtNum(totalShipments)}</td>
     <td style="text-align:right;">${fmtNum(totalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(totalUnits)}</td>
     <td style="text-align:right;">${fmtNum(totalBoxes)}</td>
