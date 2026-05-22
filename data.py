@@ -771,16 +771,26 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
 def monthly_deliveries(df: pd.DataFrame) -> list:
     MONTHS = ["January","February","March","April","May","June",
               "July","August","September","October","November","December"]
-    d = df[df["is_delivered"]].copy()
     result = []
     for m in MONTHS:
-        mdf = d[d["Month"].astype(str).str.strip() == m]
-        if len(mdf):
-            result.append({
-                "month": m[:3],
-                "shipments": len(mdf),
-                "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
-            })
+        mdf = df[df["Month"].astype(str).str.strip() == m]
+        if not len(mdf):
+            continue
+        del_df   = mdf[mdf["is_delivered"]]
+        undel_df = mdf[~mdf["is_delivered"]]
+        delivered_units   = int(del_df["Qty Sent"].fillna(0).sum())   if "Qty Sent" in df.columns else 0
+        undelivered_units = int(undel_df["Qty Sent"].fillna(0).sum()) if "Qty Sent" in df.columns else 0
+        by_status = (
+            undel_df.groupby(STATUS_COL)["Qty Sent"].sum().fillna(0).astype(int).to_dict()
+            if "Qty Sent" in df.columns and STATUS_COL in df.columns else {}
+        )
+        result.append({
+            "month": m[:3],
+            "month_full": m,
+            "delivered_units": delivered_units,
+            "undelivered_units": undelivered_units,
+            "undelivered_by_status": by_status,
+        })
     return result
 
 

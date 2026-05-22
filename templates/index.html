@@ -1082,21 +1082,61 @@ async function loadSummary() {
   const momRes = await apiFetch('/api/monthly-deliveries');
   const momData = await momRes.json();
   if (momData.length) {
-    getChart('chart-mom-deliveries', 'bar', {
+    const momChart = getChart('chart-mom-deliveries', 'bar', {
       labels: momData.map(r => r.month),
       datasets: [
-        { label: 'Shipments', data: momData.map(r => r.shipments), backgroundColor: '#4f8ef7', yAxisID: 'y' },
-        { label: 'Units', data: momData.map(r => r.units), backgroundColor: '#38a169', yAxisID: 'y1' },
+        { label: 'Delivered Units',   data: momData.map(r => r.delivered_units),   backgroundColor: '#38a169' },
+        { label: 'Undelivered Units', data: momData.map(r => r.undelivered_units), backgroundColor: '#f97316' },
       ]
     }, { ...CHART_DEFAULTS,
       scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.05)' } },
-        y:  { type: 'linear', position: 'left',  beginAtZero: true, title: { display: true, text: 'Shipments', color: '#4f8ef7' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y1: { type: 'linear', position: 'right', beginAtZero: true, title: { display: true, text: 'Units',     color: '#38a169' }, grid: { drawOnChartArea: false } },
+        x: { grid: { color: 'rgba(0,0,0,0.04)' } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, title: { display: true, text: 'Units', color: '#555' } },
       },
       layout: { padding: { top: 28 } },
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        const el = elements[0];
+        if (el.datasetIndex !== 1) return;
+        const row = momData[el.index];
+        navigateToRawData({ statusGroup: 'undelivered', month: row.month_full });
+      },
+      onHover(evt, elements) {
+        evt.native.target.style.cursor = (elements.length && elements[0].datasetIndex === 1) ? 'pointer' : 'default';
+      },
       plugins: { ...CHART_DEFAULTS.plugins,
-        legend: { position: 'bottom', labels: { font: { size: 12 } } },
+        legend: {
+          position: 'bottom',
+          labels: { font: { size: 12 } },
+          onClick(e, legendItem, legend) {
+            if (legendItem.datasetIndex === 1) {
+              navigateToRawData({ statusGroup: 'undelivered' });
+            } else {
+              Chart.defaults.plugins.legend.onClick.call(legend, e, legendItem, legend);
+            }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            title(ctx) { return ctx[0].label; },
+            label(ctx) {
+              return ` ${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)}`;
+            },
+            afterBody(ctx) {
+              const item = ctx.find(c => c.datasetIndex === 1);
+              if (!item) return [];
+              const row = momData[item.dataIndex];
+              const breakdown = row.undelivered_by_status || {};
+              const lines = ['', '  Undelivered by status:'];
+              Object.entries(breakdown).sort((a,b) => b[1]-a[1]).forEach(([s, u]) => {
+                lines.push(`  • ${s}: ${fmtNum(u)} units`);
+              });
+              if (lines.length === 2) return [];
+              lines.push('', '  ↗ Click bar to view in Raw Data');
+              return lines;
+            }
+          }
+        },
         datalabels: {
           display: true,
           anchor: 'end',
@@ -1939,6 +1979,7 @@ function renderRawRows() {
     const DONE = new Set(['Delivered', 'RTO', 'Abandon']);
     if (_rawNavFilter.statusGroup === 'undelivered') rows = rows.filter(r => !DONE.has(r[STATUS_KEY]));
     if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
+    if (_rawNavFilter.month) rows = rows.filter(r => String(r['Month']||'').trim() === _rawNavFilter.month);
   }
   if (search) rows = rows.filter(r => _rawCols.some(c => String(r[c]||'').toLowerCase().includes(search)));
   if (_rawSort.col >= 0) {
