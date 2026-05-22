@@ -33,12 +33,7 @@
     <span class="nav-icon">🚚</span> Undelivered
   </div>
   <div class="nav-item" data-view="tonnage">
-    <span class="nav-icon">⚖️</span> Tonnage
-  </div>
-
-  <div class="sidebar-section-label">Performance</div>
-  <div class="nav-item" data-view="scorecard">
-    <span class="nav-icon">🏆</span> Transporter Scorecard
+    <span class="nav-icon">⚖️</span> Monthly Tonnage &amp; Scorecard
   </div>
 
   <div class="sidebar-section-label">Channels</div>
@@ -423,7 +418,7 @@
   <div class="view" id="view-tonnage">
     <div class="page-header">
       <div>
-        <h2>Tonnage Report</h2>
+        <h2>Monthly Tonnage &amp; Scorecard</h2>
         <div class="subtitle" id="tonnage-subtitle">Carrier-wise volumetric weight, units &amp; boxes by month</div>
       </div>
     </div>
@@ -457,6 +452,29 @@
         </div>
         <div id="tonnage-table-wrap" style="overflow-x:auto;">
           <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <!-- Transporter Scorecard -->
+      <div class="card" style="padding:0;overflow:hidden;margin-top:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);">
+          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">🏆 Transporter Scorecard</span>
+          <span style="font-size:11px;color:var(--text-400);margin-left:12px;">Ranked by delivery rate</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th><th>Transporter</th><th>Total</th>
+                <th>Delivered</th><th>Delivery Rate</th>
+                <th>Avg Prom TAT</th><th>Avg Actual TAT</th>
+                <th>Avg Delay</th><th>On-Time %</th>
+              </tr>
+            </thead>
+            <tbody id="tonnage-scorecard-tbody">
+              <tr><td colspan="9" class="loading-state"><div class="spinner"></div> Loading…</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1861,6 +1879,26 @@ async function loadTonnage() {
     <td style="text-align:right;">${fmtNum(totalBoxes)}</td>
   </tr></tfoot></table>`;
   document.getElementById('tonnage-table-wrap').innerHTML = html;
+
+  // Scorecard section
+  const scRes = await apiFetch('/api/scorecard');
+  const scRows = await scRes.json();
+  const scTbody = document.getElementById('tonnage-scorecard-tbody');
+  if (!scRows.length) {
+    scTbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#718096;">No data</td></tr>';
+  } else {
+    scTbody.innerHTML = scRows.map((r, i) => `<tr>
+      <td><span class="rank-badge" style="background:${i===0?'#d69e2e':i===1?'#718096':i===2?'#c05621':'#4f8ef7'}">${i+1}</span></td>
+      <td><strong>${r.Transporter}</strong></td>
+      <td>${fmtNum(r.total)}</td>
+      <td>${fmtNum(r.delivered)}</td>
+      <td><span class="badge ${r.delivery_rate >= 80 ? 'badge-green' : r.delivery_rate >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.delivery_rate)}%</span></td>
+      <td>${fmtFloat(r.avg_prom_tat)}</td>
+      <td>${fmtFloat(r.avg_actual_tat)}</td>
+      <td>${delayBadge(r.avg_delay)}</td>
+      <td><span class="badge ${r.on_time_pct === '' ? 'badge-gray' : r.on_time_pct >= 80 ? 'badge-green' : r.on_time_pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(r.on_time_pct)}%</span></td>
+    </tr>`).join('');
+  }
 }
 
 function clearTonnageFilters() {
