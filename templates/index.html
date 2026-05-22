@@ -1490,8 +1490,8 @@ async function loadUndelivered() {
     ${Object.entries(byChannel).map(([ch, cnt]) => `
     <div class="kpi-card" style="cursor:pointer;" onclick="navigateToRawData({statusGroup:'undelivered',channel:'${ch}'})">
       <div class="kpi-label">${ch}</div>
-      <div class="kpi-value">${fmtNum(cnt)} shipments</div>
-      <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(unitsByChannel[ch] || 0)} units</div>
+      <div style="font-size:26px;font-weight:600;color:var(--text-700);line-height:1;font-family:var(--font-display);margin-bottom:6px;">${fmtNum(cnt)}</div>
+      <div style="font-size:11px;color:var(--text-400);font-weight:500;">${fmtNum(unitsByChannel[ch] || 0)} units</div>
       <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;">↗ View in Raw Data</div>
     </div>`).join('')}
   `;
