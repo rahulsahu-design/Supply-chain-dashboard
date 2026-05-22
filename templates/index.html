@@ -110,10 +110,18 @@
       <div class="kpi-grid" id="summary-kpis">
         <div class="loading-state"><div class="spinner"></div> Loading…</div>
       </div>
-      <div style="display:flex;gap:20px;margin-bottom:20px;">
+      <div style="display:flex;gap:20px;margin-bottom:20px;align-items:flex-start;">
         <div class="card" style="flex:0 0 440px;">
           <h3>Status Breakdown</h3>
           <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+        </div>
+        <div class="card" style="flex:1;padding:0;overflow:hidden;">
+          <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);">
+            <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Tonnage Summary</span>
+          </div>
+          <div id="daily-tonnage-table" style="overflow-x:auto;">
+            <div class="loading-state"><div class="spinner"></div> Loading…</div>
+          </div>
         </div>
       </div>
       <div class="card" style="margin-top:20px;">
@@ -1083,6 +1091,43 @@ async function loadSummary() {
       <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
     </div>`).join('');
   renderAgeingTable('daily-ageing-pivot-wrap', dailyAgeing);
+
+  // Tonnage summary table beside Status Breakdown
+  const tonnageRes = await apiFetch('/api/tonnage');
+  const tonnageData = await tonnageRes.json();
+  const tRows = tonnageData.rows || [];
+  if (!tRows.length) {
+    document.getElementById('daily-tonnage-table').innerHTML = '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>';
+  } else {
+    const tTotalShipments = tRows.reduce((s, r) => s + r.shipments, 0);
+    const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
+    const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
+    const tTotalBoxes     = tRows.reduce((s, r) => s + r.boxes, 0);
+    let th = `<table class="pivot-table"><thead><tr>
+      <th>Month</th>
+      <th style="text-align:right;">Shipments</th>
+      <th style="text-align:right;">Vol. Wt (kg)</th>
+      <th style="text-align:right;">Units</th>
+      <th style="text-align:right;">Boxes</th>
+    </tr></thead><tbody>`;
+    tRows.forEach(r => {
+      th += `<tr>
+        <td><strong>${r.month}</strong></td>
+        <td style="text-align:right;">${fmtNum(r.shipments)}</td>
+        <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
+        <td style="text-align:right;">${fmtNum(r.units)}</td>
+        <td style="text-align:right;">${fmtNum(r.boxes)}</td>
+      </tr>`;
+    });
+    th += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
+      <td>Total</td>
+      <td style="text-align:right;">${fmtNum(tTotalShipments)}</td>
+      <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
+      <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
+      <td style="text-align:right;">${fmtNum(tTotalBoxes)}</td>
+    </tr></tfoot></table>`;
+    document.getElementById('daily-tonnage-table').innerHTML = th;
+  }
 }
 
 // ── Period quick-select helper ──────────────────────────────────────────────
