@@ -52,6 +52,10 @@
   <div class="nav-item" data-view="raw-data">
     <span class="nav-icon">🗃️</span> Raw Data 2026
   </div>
+  <div class="sidebar-section-label">Logistics</div>
+  <div class="nav-item" data-view="tonnage">
+    <span class="nav-icon">⚖️</span> Tonnage
+  </div>
 
   <div class="sidebar-section-label">Archive</div>
   <div class="nav-item" data-view="summary-2025">
@@ -117,6 +121,20 @@
           <h3>Channel Breakdown</h3>
           <div class="chart-wrap"><canvas id="chart-channel-summary"></canvas></div>
         </div>
+      </div>
+      <div class="card" style="margin-top:20px;">
+        <h3>Month-on-Month Deliveries</h3>
+        <div class="chart-wrap" style="height:220px;"><canvas id="chart-mom-deliveries"></canvas></div>
+      </div>
+      <div style="margin-top:24px;">
+        <div style="padding:11px 20px 0;font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">⏳ Pending Ageing Snapshot</div>
+        <div class="kpi-grid" id="daily-ageing-kpis" style="margin:12px 0 4px;"></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;margin-top:8px;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fee2e2;">
+          <span style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #ef4444;padding-left:10px;">⏳ Pending Units — Transporter × Ageing Bucket</span>
+        </div>
+        <div id="daily-ageing-pivot-wrap" style="overflow-x:auto;"></div>
       </div>
     </div>
   </div>
@@ -374,6 +392,7 @@
         <label>Search</label>
         <input type="text" id="raw-search" placeholder="Filter any column…" oninput="filterRawTable()" style="min-width:240px;">
         <button class="gf-clear-btn" onclick="document.getElementById('raw-search').value='';filterRawTable()">✕ Clear</button>
+        <span id="raw-nav-filter-badge" style="display:none;background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:3px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;" onclick="clearRawNavFilter()">✕ Clear filter</span>
         <span id="raw-count" style="margin-left:auto;font-size:12px;color:var(--text-400);"></span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
@@ -382,6 +401,49 @@
             <thead id="raw-thead"></thead>
             <tbody id="raw-tbody"><tr><td class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Tonnage ──────────────────────────────────────────────────── -->
+  <div class="view" id="view-tonnage">
+    <div class="page-header">
+      <div>
+        <h2>Tonnage Report</h2>
+        <div class="subtitle" id="tonnage-subtitle">Carrier-wise volumetric weight, units &amp; boxes by month</div>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <label>Transporter</label>
+        <div class="ms-dropdown" id="ms-tonnage-transporter" data-all-label="All Transporters">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-tonnage-transporter')">
+            <span class="ms-label">All Transporters</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel" id="ms-tonnage-transporter-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-tonnage-transporter',this)" checked> All</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="loadTonnage()">Apply</button>
+        <button class="gf-clear-btn" onclick="clearTonnageFilters()">✕ Clear</button>
+      </div>
+      <div class="chart-row" style="margin-bottom:24px;">
+        <div class="card">
+          <h3>Volumetric Weight (kg) by Month</h3>
+          <div class="chart-wrap" style="height:220px;"><canvas id="chart-tonnage-vol"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Units &amp; Boxes by Month</h3>
+          <div class="chart-wrap" style="height:220px;"><canvas id="chart-tonnage-units"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);">
+          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Tonnage Summary</span>
+        </div>
+        <div id="tonnage-table-wrap" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
         </div>
       </div>
     </div>
@@ -871,6 +933,7 @@ function loadView(view, force) {
     case 'raw-data':       return loadRawData();
     case 'team-summary':   return loadTeamSummary();
     case 'summary-2025':   return loadSummary2025();
+    case 'tonnage':        return loadTonnage();
   }
 }
 
@@ -956,11 +1019,19 @@ async function loadSummary() {
     </div>
   `;
 
-  // Status doughnut
+  // Status doughnut with per-status colors
   const statuses = s.status_breakdown;
+  const STATUS_COLORS = {
+    'Delivered': '#38a169',
+    'Abandon': '#e53e3e',
+    'In Transit': '#ed8936',
+    'Under Process': '#d69e2e',
+  };
+  const statusLabels = Object.keys(statuses);
+  const statusColors = statusLabels.map(l => STATUS_COLORS[l] || PALETTE[statusLabels.indexOf(l) % PALETTE.length]);
   getChart('chart-status', 'doughnut', {
-    labels: Object.keys(statuses),
-    datasets: [{ data: Object.values(statuses), backgroundColor: PALETTE, borderWidth: 2 }]
+    labels: statusLabels,
+    datasets: [{ data: Object.values(statuses), backgroundColor: statusColors, borderWidth: 2 }]
   }, { ...CHART_DEFAULTS, plugins: { ...CHART_DEFAULTS.plugins, legend: { position: 'right', labels: { font: { size: 12 } } } } });
 
   // Channel bar
@@ -972,6 +1043,37 @@ async function loadSummary() {
       { label: 'Undelivered', data: ch.map(r => r.total - r.delivered), backgroundColor: '#4f8ef7' },
     ]
   }, { ...CHART_DEFAULTS, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } });
+
+  // MoM deliveries chart
+  const momRes = await apiFetch('/api/monthly-deliveries');
+  const momData = await momRes.json();
+  if (momData.length) {
+    getChart('chart-mom-deliveries', 'bar', {
+      labels: momData.map(r => r.month),
+      datasets: [
+        { label: 'Shipments', data: momData.map(r => r.shipments), backgroundColor: '#4f8ef7', yAxisID: 'y' },
+        { label: 'Units', data: momData.map(r => r.units), backgroundColor: '#38a169', yAxisID: 'y1' },
+      ]
+    }, { ...CHART_DEFAULTS,
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' } },
+        y:  { type: 'linear', position: 'left',  beginAtZero: true, title: { display: true, text: 'Shipments', color: '#4f8ef7' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y1: { type: 'linear', position: 'right', beginAtZero: true, title: { display: true, text: 'Units',     color: '#38a169' }, grid: { drawOnChartArea: false } },
+      }
+    });
+  }
+
+  // Pending ageing snapshot
+  const dailyAgeingRes = await apiFetch('/api/ageing');
+  const dailyAgeing = await dailyAgeingRes.json();
+  const dailyAgeingTotals = dailyAgeing.totals || [];
+  document.getElementById('daily-ageing-kpis').innerHTML = dailyAgeingTotals.map(r => `
+    <div class="kpi-card ${r.bucket === '21-30' || r.bucket === '30+' || r.bucket === '31-40' || r.bucket === '40+' ? 'accent-red' : r.bucket === '11-20' ? 'accent-orange' : ''}">
+      <div class="kpi-label">${r.bucket} days</div>
+      <div class="kpi-value">${fmtNum(r.count)}</div>
+      <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(r.units || 0)} units</div>
+    </div>`).join('');
+  renderAgeingTable('daily-ageing-pivot-wrap', dailyAgeing);
 }
 
 // ── Period quick-select helper ──────────────────────────────────────────────
@@ -1378,19 +1480,26 @@ async function loadUndelivered() {
     byChannel[r.Channel] = (byChannel[r.Channel] || 0) + 1;
     totalQty += Number(r['Qty Sent']) || 0;
   });
+  const unitsByChannel = {};
+  rows.forEach(r => { unitsByChannel[r.Channel] = (unitsByChannel[r.Channel] || 0) + (Number(r['Qty Sent']) || 0); });
+
   document.getElementById('undel-kpis').innerHTML = `
-    <div class="kpi-card accent-blue">
+    <div class="kpi-card accent-blue" style="cursor:pointer;" onclick="navigateToRawData({statusGroup:'undelivered'})">
       <div class="kpi-label">Total Pending Shipments</div>
       <div class="kpi-value">${fmtNum(rows.length)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;">↗ View in Raw Data</div>
     </div>
-    <div class="kpi-card accent-orange">
+    <div class="kpi-card accent-orange" style="cursor:pointer;" onclick="navigateToRawData({statusGroup:'undelivered'})">
       <div class="kpi-label">Total Pending Units</div>
       <div class="kpi-value">${fmtNum(totalQty)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;">↗ View in Raw Data</div>
     </div>
     ${Object.entries(byChannel).map(([ch, cnt]) => `
-    <div class="kpi-card">
+    <div class="kpi-card" style="cursor:pointer;" onclick="navigateToRawData({statusGroup:'undelivered',channel:'${ch}'})">
       <div class="kpi-label">${ch}</div>
-      <div class="kpi-value">${fmtNum(cnt)}</div>
+      <div class="kpi-value">${fmtNum(cnt)} shipments</div>
+      <div style="font-size:11px;color:var(--text-400);margin-top:5px;font-weight:500;">${fmtNum(unitsByChannel[ch] || 0)} units</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;">↗ View in Raw Data</div>
     </div>`).join('')}
   `;
 
@@ -1581,6 +1690,88 @@ async function loadChannelHealth() {
   `).join('');
 }
 
+// ── View: Tonnage ─────────────────────────────────────────────────────────
+let _tonnageTransporterOptions = [];
+
+async function loadTonnage() {
+  document.getElementById('tonnage-table-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
+
+  const transporters = getMsValues('ms-tonnage-transporter');
+  const extra = new URLSearchParams();
+  if (transporters.length) extra.set('transporters', transporters.join(','));
+
+  const res = await apiFetch('/api/tonnage', extra);
+  const data = await res.json();
+
+  // Populate transporter multi-select on first load
+  if (!_tonnageTransporterOptions.length && data.transporters && data.transporters.length) {
+    _tonnageTransporterOptions = data.transporters;
+    const panel = document.getElementById('ms-tonnage-transporter-panel');
+    data.transporters.forEach(t => {
+      panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${t}" onchange="msItemToggle('ms-tonnage-transporter',this)"> ${t}</label>`;
+    });
+  }
+
+  const rows = data.rows || [];
+  document.getElementById('tonnage-subtitle').textContent =
+    `${rows.length} month${rows.length !== 1 ? 's' : ''} of data · Carrier-wise summary`;
+
+  // Charts
+  if (rows.length) {
+    getChart('chart-tonnage-vol', 'bar', {
+      labels: rows.map(r => r.month),
+      datasets: [{ label: 'Vol. Weight (kg)', data: rows.map(r => r.vol_wt), backgroundColor: '#4f8ef7' }]
+    }, { ...CHART_DEFAULTS, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } });
+
+    getChart('chart-tonnage-units', 'bar', {
+      labels: rows.map(r => r.month),
+      datasets: [
+        { label: 'Units', data: rows.map(r => r.units), backgroundColor: '#38a169' },
+        { label: 'Boxes', data: rows.map(r => r.boxes), backgroundColor: '#d69e2e' },
+      ]
+    }, { ...CHART_DEFAULTS, scales: { x: { stacked: false, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } });
+  }
+
+  // Table
+  if (!rows.length) {
+    document.getElementById('tonnage-table-wrap').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-400);">No data for selected filters</div>';
+    return;
+  }
+  const totalVolWt = rows.reduce((s, r) => s + r.vol_wt, 0);
+  const totalUnits = rows.reduce((s, r) => s + r.units, 0);
+  const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
+  let html = `<table class="pivot-table"><thead><tr>
+    <th>Month</th>
+    <th style="text-align:right;">Vol. Weight (kg)</th>
+    <th style="text-align:right;">Units</th>
+    <th style="text-align:right;">Boxes</th>
+  </tr></thead><tbody>`;
+  rows.forEach(r => {
+    html += `<tr>
+      <td><strong>${r.month}</strong></td>
+      <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
+      <td style="text-align:right;">${fmtNum(r.units)}</td>
+      <td style="text-align:right;">${fmtNum(r.boxes)}</td>
+    </tr>`;
+  });
+  html += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
+    <td>Total</td>
+    <td style="text-align:right;">${fmtNum(totalVolWt)}</td>
+    <td style="text-align:right;">${fmtNum(totalUnits)}</td>
+    <td style="text-align:right;">${fmtNum(totalBoxes)}</td>
+  </tr></tfoot></table>`;
+  document.getElementById('tonnage-table-wrap').innerHTML = html;
+}
+
+function clearTonnageFilters() {
+  const el = document.getElementById('ms-tonnage-transporter');
+  el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  const allCb = el.querySelector('input[value="__all__"]');
+  if (allCb) allCb.checked = true;
+  updateMsLabel('ms-tonnage-transporter');
+  loadTonnage();
+}
+
 // ── View 9: Raw Data 2026 ────────────────────────────────────────────────
 const RAW_COL_TYPES = {
   'Prom TAT':'num','Actual TAT':'num','Delay Days':'num','Ageing':'num','Qty Sent':'num',
@@ -1601,6 +1792,12 @@ function renderRawRows() {
   const tbody = document.getElementById('raw-tbody');
   const rawCols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
   let rows = applyColFilters(_rawRows, rawCols, _tableFilters.raw);
+  if (_rawNavFilter) {
+    const STATUS_KEY = 'Current Status - Ship partner portal';
+    const DONE = new Set(['Delivered', 'RTO', 'Abandon']);
+    if (_rawNavFilter.statusGroup === 'undelivered') rows = rows.filter(r => !DONE.has(r[STATUS_KEY]));
+    if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
+  }
   if (search) rows = rows.filter(r => _rawCols.some(c => String(r[c]||'').toLowerCase().includes(search)));
   if (_rawSort.col >= 0) {
     const col = { key: _rawCols[_rawSort.col], type: RAW_COL_TYPES[_rawCols[_rawSort.col]] || 'str' };
@@ -1621,6 +1818,37 @@ function renderRawRows() {
 }
 
 function filterRawTable() { renderRawRows(); }
+
+let _rawNavFilter = null;
+
+function navigateToRawData(filter) {
+  _rawNavFilter = filter;
+  navItems.forEach(n => n.classList.remove('active'));
+  views.forEach(v => v.classList.remove('active'));
+  const rawItem = document.querySelector('[data-view="raw-data"]');
+  if (rawItem) rawItem.classList.add('active');
+  document.getElementById('view-raw-data').classList.add('active');
+  const badge = document.getElementById('raw-nav-filter-badge');
+  if (badge) {
+    const parts = [];
+    if (filter.statusGroup === 'undelivered') parts.push('Undelivered');
+    if (filter.channel) parts.push(filter.channel);
+    badge.textContent = '✕ Filtered: ' + parts.join(' + ');
+    badge.style.display = 'inline-block';
+  }
+  if (_rawRows.length > 0) {
+    renderRawRows();
+  } else {
+    loadRawData();
+  }
+}
+
+function clearRawNavFilter() {
+  _rawNavFilter = null;
+  const badge = document.getElementById('raw-nav-filter-badge');
+  if (badge) badge.style.display = 'none';
+  renderRawRows();
+}
 
 async function loadRawData() {
   const tbody = document.getElementById('raw-tbody');

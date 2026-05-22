@@ -107,7 +107,7 @@ def _do_fetch():
                 parsed[failed] = parsed3
             df[col] = parsed
 
-    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent"]:
+    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "Vol. Wt", "No. Of box"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -751,17 +751,60 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
         avg_actual_tat=("Actual TAT", "mean"),
         avg_prom_tat=("Prom TAT", "mean"),
         avg_delay=("Delay Days", "mean"),
-        on_time=("Delay Days", lambda x: (x.dropna() <= 0).sum()),
-        tat_count=("Actual TAT", "count"),
     ).reset_index()
 
-    # on_time_pct based only on shipments that have TAT data
+    del_df = df[df["is_delivered"] & df["Delay Days"].notna()].copy()
+    on_time_grp = del_df.groupby("Transporter").agg(
+        on_time=("Delay Days", lambda x: (x <= 0).sum()),
+        tat_count=("Delay Days", "count"),
+    ).reset_index()
+
+    grouped = grouped.merge(on_time_grp, on="Transporter", how="left")
     grouped["on_time_pct"] = (
-        grouped["on_time"] / grouped["tat_count"].replace(0, float('nan')) * 100
+        grouped["on_time"] / grouped["tat_count"].replace(0, float("nan")) * 100
     ).round(1)
     grouped["delivery_rate"] = (grouped["delivered"] / grouped["total"] * 100).round(1)
     grouped = grouped.round(2).sort_values("delivery_rate", ascending=False)
     return grouped.fillna("").to_dict(orient="records")
+
+
+def monthly_deliveries(df: pd.DataFrame) -> list:
+    MONTHS = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"]
+    d = df[df["is_delivered"]].copy()
+    result = []
+    for m in MONTHS:
+        mdf = d[d["Month"].astype(str).str.strip() == m]
+        if len(mdf):
+            result.append({
+                "month": m[:3],
+                "shipments": len(mdf),
+                "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
+            })
+    return result
+
+
+def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
+    MONTHS = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"]
+    d = df.copy()
+    if transporters:
+        d = d[d["Transporter"].str.strip().isin(transporters)]
+    rows = []
+    for m in MONTHS:
+        mdf = d[d["Month"].astype(str).str.strip() == m]
+        if len(mdf) == 0:
+            continue
+        rows.append({
+            "month": m[:3],
+            "vol_wt": round(float(mdf["Vol. Wt"].fillna(0).sum()), 1) if "Vol. Wt" in mdf.columns else 0,
+            "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
+            "boxes": int(mdf["No. Of box"].fillna(0).sum()) if "No. Of box" in mdf.columns else 0,
+        })
+    all_transporters = sorted(
+        df["Transporter"].dropna().str.strip().replace("", pd.NA).dropna().unique().tolist()
+    )
+    return {"rows": rows, "transporters": all_transporters}
 
 
 def channel_health(df: pd.DataFrame) -> list:

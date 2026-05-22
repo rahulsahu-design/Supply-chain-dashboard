@@ -141,6 +141,18 @@ def api_scorecard():
     return jsonify(d.transporter_scorecard(_filtered_df()))
 
 
+@app.route("/api/monthly-deliveries")
+def api_monthly_deliveries():
+    return jsonify(d.monthly_deliveries(_filtered_df()))
+
+
+@app.route("/api/tonnage")
+def api_tonnage():
+    transporters_raw = request.args.get("transporters", "All")
+    transporters = [t.strip() for t in transporters_raw.split(",")] if transporters_raw and transporters_raw != "All" else None
+    return jsonify(d.tonnage_report(_filtered_df(), transporters=transporters))
+
+
 @app.route("/api/channel-health")
 def api_channel_health():
     return jsonify(d.channel_health(_filtered_df()))
