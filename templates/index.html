@@ -22,7 +22,7 @@
 
   <div class="sidebar-section-label">Overview</div>
   <div class="nav-item active" data-view="daily-summary">
-    <span class="nav-icon">📊</span> Daily Summary
+    <span class="nav-icon">📊</span> Operations Summary
   </div>
 
   <div class="sidebar-section-label">Shipments</div>
@@ -43,7 +43,7 @@
 
   <div class="sidebar-section-label">Reports</div>
   <div class="nav-item" data-view="team-summary">
-    <span class="nav-icon">📋</span> Team Summary
+    <span class="nav-icon">📋</span> Daily Summary
   </div>
 
   <div class="sidebar-section-label">Data</div>
@@ -97,7 +97,7 @@
   <div class="view active" id="view-daily-summary">
     <div class="page-header">
       <div>
-        <h2>Daily Operations Summary</h2>
+        <h2>Operations Summary</h2>
         <div class="subtitle" id="summary-date">Loading…</div>
       </div>
     </div>
@@ -125,7 +125,7 @@
               <button class="btn btn-primary" onclick="loadDailyTonnage()" style="font-size:11px;padding:4px 12px;">Apply</button>
             </div>
           </div>
-          <div id="daily-tonnage-table" style="overflow-x:auto;flex:1;">
+          <div id="daily-tonnage-table" style="flex:1;overflow:hidden;position:relative;">
             <div class="loading-state"><div class="spinner"></div> Loading…</div>
           </div>
         </div>
@@ -484,7 +484,7 @@
   <div class="view" id="view-team-summary">
     <div class="page-header">
       <div>
-        <h2>Team Summary</h2>
+        <h2>Daily Summary</h2>
         <div class="subtitle" id="ts-subtitle">Daily operations overview — ready to screenshot &amp; share</div>
       </div>
       <button class="btn btn-primary" onclick="openSummaryModal()" style="display:flex;align-items:center;gap:6px;padding:9px 18px;">
@@ -1129,7 +1129,7 @@ let _dailyTonnageTransporterInited = false;
 
 async function loadDailyTonnage() {
   document.getElementById('daily-tonnage-table').innerHTML =
-    '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
+    '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div class="loading-state"><div class="spinner"></div> Loading…</div></div>';
   const transporters = getMsValues('ms-dt-transporter');
   const extra = new URLSearchParams();
   if (transporters.length) extra.set('transporters', transporters.join(','));
@@ -1147,7 +1147,7 @@ async function loadDailyTonnage() {
   const tRows = tonnageData.rows || [];
   if (!tRows.length) {
     document.getElementById('daily-tonnage-table').innerHTML =
-      '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>';
+      '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-400);font-size:13px;">No data</div>';
     return;
   }
   const tTotalShipments = tRows.reduce((s, r) => s + r.shipments, 0);
@@ -1157,8 +1157,12 @@ async function loadDailyTonnage() {
   const tTotalBoxes     = tRows.reduce((s, r) => s + r.boxes, 0);
   const _otBadge = pct => pct == null ? '—'
     : `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(pct)}%</span>`;
-  let th = `<table class="pivot-table"><thead><tr>
-    <th>Month</th>
+  let th = `<div style="position:absolute;inset:0;overflow:auto;">
+  <table class="pivot-table" style="table-layout:fixed;height:100%;"><colgroup>
+    <col style="width:22%"><col style="width:13%"><col style="width:13%">
+    <col style="width:13%"><col style="width:16%"><col style="width:12%"><col style="width:11%">
+  </colgroup><thead><tr>
+    <th style="text-align:left;min-width:unset;position:relative;">Month</th>
     <th style="text-align:right;">Shipments</th>
     <th style="text-align:right;">Delivered</th>
     <th style="text-align:right;">On Time %</th>
@@ -1168,7 +1172,7 @@ async function loadDailyTonnage() {
   </tr></thead><tbody>`;
   tRows.forEach(r => {
     th += `<tr>
-      <td><strong>${r.month}</strong></td>
+      <td style="position:relative;"><strong>${r.month}</strong></td>
       <td style="text-align:right;">${fmtNum(r.shipments)}</td>
       <td style="text-align:right;">${fmtNum(r.delivered)}</td>
       <td style="text-align:right;">${_otBadge(r.on_time_pct)}</td>
@@ -1178,14 +1182,14 @@ async function loadDailyTonnage() {
     </tr>`;
   });
   th += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
-    <td>Total</td>
+    <td style="position:relative;">Total</td>
     <td style="text-align:right;">${fmtNum(tTotalShipments)}</td>
     <td style="text-align:right;">${fmtNum(tTotalDelivered)}</td>
     <td style="text-align:right;">—</td>
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
     <td style="text-align:right;">${fmtNum(tTotalBoxes)}</td>
-  </tr></tfoot></table>`;
+  </tr></tfoot></table></div>`;
   document.getElementById('daily-tonnage-table').innerHTML = th;
 }
 
@@ -2207,7 +2211,7 @@ function clearTsUndelFilters() {
 }
 
 function openSummaryModal() {
-  if (!_tsDelPivotData) { alert('Load the Team Summary tab first.'); return; }
+  if (!_tsDelPivotData) { alert('Load the Daily Summary tab first.'); return; }
 
   // Copy tables
   document.getElementById('ts-modal-del').innerHTML         = document.getElementById('ts-del-pivot').innerHTML;
