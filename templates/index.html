@@ -1082,7 +1082,15 @@ async function loadSummary() {
   const momRes = await apiFetch('/api/monthly-deliveries');
   const momData = await momRes.json();
   if (momData.length) {
-    const momChart = getChart('chart-mom-deliveries', 'bar', {
+    // Floating HTML tooltip for the undelivered label (bar too small to hover reliably)
+    let _momTip = document.getElementById('_mom-undel-tip');
+    if (!_momTip) {
+      _momTip = document.createElement('div');
+      _momTip.id = '_mom-undel-tip';
+      _momTip.style.cssText = 'position:fixed;z-index:9999;background:#1e293b;color:#f8fafc;border-radius:10px;padding:12px 16px;font-size:12px;pointer-events:none;box-shadow:0 4px 24px rgba(0,0,0,0.35);min-width:210px;display:none;line-height:1.7;';
+      document.body.appendChild(_momTip);
+    }
+    getChart('chart-mom-deliveries', 'bar', {
       labels: momData.map(r => r.month),
       datasets: [
         { label: 'Delivered Units',   data: momData.map(r => r.delivered_units),   backgroundColor: '#38a169' },
@@ -1116,34 +1124,49 @@ async function loadSummary() {
             }
           }
         },
-        tooltip: {
-          callbacks: {
-            title(ctx) { return ctx[0].label; },
-            label(ctx) {
-              return ` ${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)}`;
-            },
-            afterBody(ctx) {
-              const item = ctx.find(c => c.datasetIndex === 1);
-              if (!item) return [];
-              const row = momData[item.dataIndex];
-              const breakdown = row.undelivered_by_status || {};
-              const lines = ['', '  Undelivered by status:'];
-              Object.entries(breakdown).sort((a,b) => b[1]-a[1]).forEach(([s, u]) => {
-                lines.push(`  • ${s}: ${fmtNum(u)} units`);
-              });
-              if (lines.length === 2) return [];
-              lines.push('', '  ↗ Click bar to view in Raw Data');
-              return lines;
-            }
-          }
-        },
+        tooltip: { enabled: false },
         datalabels: {
           display: true,
           anchor: 'end',
           align: 'top',
-          color: '#111',
+          color: (ctx) => ctx.datasetIndex === 1 ? '#ea580c' : '#166534',
           font: { size: 11, weight: '700' },
           formatter: (value) => value > 0 ? fmtNum(value) : '',
+          listeners: {
+            enter(ctx, evt) {
+              const ne = evt.native;
+              const row = momData[ctx.dataIndex];
+              // Delivered label: simple tooltip
+              if (ctx.datasetIndex === 0) {
+                _momTip.innerHTML = `<div style="font-weight:700;color:#4ade80;">${row.month} · Delivered: ${fmtNum(row.delivered_units)} units</div>`;
+                _momTip.style.display = 'block';
+                _momTip.style.left = (ne.clientX + 14) + 'px';
+                _momTip.style.top  = (ne.clientY - 10) + 'px';
+                return;
+              }
+              // Undelivered label: status breakdown + click hint
+              const entries = Object.entries(row.undelivered_by_status || {}).sort((a,b) => b[1]-a[1]);
+              let html = `<div style="font-weight:700;margin-bottom:8px;color:#fb923c;">${row.month} · Undelivered: ${fmtNum(row.undelivered_units)} units</div>`;
+              entries.forEach(([s,u]) => {
+                html += `<div style="display:flex;justify-content:space-between;gap:16px;"><span style="color:#94a3b8;">${s}</span><span style="font-weight:600;">${fmtNum(u)}</span></div>`;
+              });
+              html += `<div style="margin-top:8px;font-size:10px;color:#fb923c;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">↗ Click number to view in Raw Data</div>`;
+              _momTip.innerHTML = html;
+              _momTip.style.display = 'block';
+              _momTip.style.left = (ne.clientX + 14) + 'px';
+              _momTip.style.top  = (ne.clientY - 10) + 'px';
+              ne.target.style.cursor = 'pointer';
+            },
+            leave(ctx, evt) {
+              _momTip.style.display = 'none';
+              evt.native.target.style.cursor = 'default';
+            },
+            click(ctx, evt) {
+              if (ctx.datasetIndex !== 1) return;
+              const row = momData[ctx.dataIndex];
+              navigateToRawData({ statusGroup: 'undelivered', month: row.month_full });
+            }
+          }
         }
       }
     });
