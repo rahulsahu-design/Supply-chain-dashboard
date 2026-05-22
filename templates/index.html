@@ -116,8 +116,19 @@
           <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
         </div>
         <div class="card" style="flex:1;padding:0;overflow:hidden;">
-          <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);">
+          <div style="padding:8px 14px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Tonnage Summary</span>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+              <div class="ms-dropdown" id="ms-dt-transporter" data-all-label="All Transporters" style="min-width:150px;">
+                <button class="ms-trigger" type="button" onclick="toggleMs('ms-dt-transporter')" style="font-size:11px;padding:4px 10px;">
+                  <span class="ms-label">All Transporters</span><span class="ms-caret">▾</span>
+                </button>
+                <div class="ms-panel" id="ms-dt-transporter-panel">
+                  <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-dt-transporter',this)" checked> All</label>
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="loadDailyTonnage()" style="font-size:11px;padding:4px 12px;">Apply</button>
+            </div>
           </div>
           <div id="daily-tonnage-table" style="overflow-x:auto;">
             <div class="loading-state"><div class="spinner"></div> Loading…</div>
@@ -1093,41 +1104,62 @@ async function loadSummary() {
   renderAgeingTable('daily-ageing-pivot-wrap', dailyAgeing);
 
   // Tonnage summary table beside Status Breakdown
-  const tonnageRes = await apiFetch('/api/tonnage');
-  const tonnageData = await tonnageRes.json();
+  await loadDailyTonnage();
+}
+
+let _dailyTonnageTransporterInited = false;
+
+async function loadDailyTonnage() {
+  document.getElementById('daily-tonnage-table').innerHTML =
+    '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
+  const transporters = getMsValues('ms-dt-transporter');
+  const extra = new URLSearchParams();
+  if (transporters.length) extra.set('transporters', transporters.join(','));
+  const res = await apiFetch('/api/tonnage', extra);
+  const tonnageData = await res.json();
+
+  if (!_dailyTonnageTransporterInited && tonnageData.transporters && tonnageData.transporters.length) {
+    _dailyTonnageTransporterInited = true;
+    const panel = document.getElementById('ms-dt-transporter-panel');
+    tonnageData.transporters.forEach(t => {
+      panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${t}" onchange="msItemToggle('ms-dt-transporter',this)"> ${t}</label>`;
+    });
+  }
+
   const tRows = tonnageData.rows || [];
   if (!tRows.length) {
-    document.getElementById('daily-tonnage-table').innerHTML = '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>';
-  } else {
-    const tTotalShipments = tRows.reduce((s, r) => s + r.shipments, 0);
-    const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
-    const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
-    const tTotalBoxes     = tRows.reduce((s, r) => s + r.boxes, 0);
-    let th = `<table class="pivot-table"><thead><tr>
-      <th>Month</th>
-      <th style="text-align:right;">Shipments</th>
-      <th style="text-align:right;">Vol. Wt (kg)</th>
-      <th style="text-align:right;">Units</th>
-      <th style="text-align:right;">Boxes</th>
-    </tr></thead><tbody>`;
-    tRows.forEach(r => {
-      th += `<tr>
-        <td><strong>${r.month}</strong></td>
-        <td style="text-align:right;">${fmtNum(r.shipments)}</td>
-        <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
-        <td style="text-align:right;">${fmtNum(r.units)}</td>
-        <td style="text-align:right;">${fmtNum(r.boxes)}</td>
-      </tr>`;
-    });
-    th += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
-      <td>Total</td>
-      <td style="text-align:right;">${fmtNum(tTotalShipments)}</td>
-      <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
-      <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
-      <td style="text-align:right;">${fmtNum(tTotalBoxes)}</td>
-    </tr></tfoot></table>`;
-    document.getElementById('daily-tonnage-table').innerHTML = th;
+    document.getElementById('daily-tonnage-table').innerHTML =
+      '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>';
+    return;
   }
+  const tTotalShipments = tRows.reduce((s, r) => s + r.shipments, 0);
+  const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
+  const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
+  const tTotalBoxes     = tRows.reduce((s, r) => s + r.boxes, 0);
+  let th = `<table class="pivot-table"><thead><tr>
+    <th>Month</th>
+    <th style="text-align:right;">Shipments</th>
+    <th style="text-align:right;">Vol. Wt (kg)</th>
+    <th style="text-align:right;">Units</th>
+    <th style="text-align:right;">Boxes</th>
+  </tr></thead><tbody>`;
+  tRows.forEach(r => {
+    th += `<tr>
+      <td><strong>${r.month}</strong></td>
+      <td style="text-align:right;">${fmtNum(r.shipments)}</td>
+      <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
+      <td style="text-align:right;">${fmtNum(r.units)}</td>
+      <td style="text-align:right;">${fmtNum(r.boxes)}</td>
+    </tr>`;
+  });
+  th += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
+    <td>Total</td>
+    <td style="text-align:right;">${fmtNum(tTotalShipments)}</td>
+    <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
+    <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
+    <td style="text-align:right;">${fmtNum(tTotalBoxes)}</td>
+  </tr></tfoot></table>`;
+  document.getElementById('daily-tonnage-table').innerHTML = th;
 }
 
 // ── Period quick-select helper ──────────────────────────────────────────────
