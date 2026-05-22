@@ -783,7 +783,7 @@ function renderMomChart(data) {
       if (!elements.length) return;
       const el = elements[0];
       if (el.datasetIndex !== 1) return;
-      navigateToRawData({ statusGroup: 'undelivered' });
+      navigateToRawData({ statusGroup: 'undelivered', month: data[el.index].month_full });
     },
     onHover(evt, elements) {
       evt.native.target.style.cursor = (elements.length && elements[0].datasetIndex === 1) ? 'pointer' : 'default';
@@ -820,7 +820,7 @@ function renderMomChart(data) {
           leave(ctx, evt) { _momTip.style.display = 'none'; evt.native.target.style.cursor = 'default'; },
           click(ctx, evt) {
             if (ctx.datasetIndex !== 1) return;
-            navigateToRawData({ statusGroup: 'undelivered' });
+            navigateToRawData({ statusGroup: 'undelivered', month: data[ctx.dataIndex].month_full });
           }
         }
       }
