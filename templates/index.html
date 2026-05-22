@@ -1057,13 +1057,15 @@ async function loadSummary() {
         y:  { type: 'linear', position: 'left',  beginAtZero: true, title: { display: true, text: 'Shipments', color: '#4f8ef7' }, grid: { color: 'rgba(255,255,255,0.05)' } },
         y1: { type: 'linear', position: 'right', beginAtZero: true, title: { display: true, text: 'Units',     color: '#38a169' }, grid: { drawOnChartArea: false } },
       },
+      layout: { padding: { top: 8 } },
       plugins: { ...CHART_DEFAULTS.plugins,
+        legend: { position: 'bottom', labels: { font: { size: 12 } } },
         datalabels: {
           display: true,
           anchor: 'end',
           align: 'top',
-          color: (ctx) => ctx.datasetIndex === 0 ? '#93c5fd' : '#6ee7b7',
-          font: { size: 10, weight: '600' },
+          color: '#111',
+          font: { size: 11, weight: '700' },
           formatter: (value) => value > 0 ? fmtNum(value) : '',
         }
       }
