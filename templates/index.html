@@ -126,7 +126,7 @@
       </div>
       <div class="card" style="margin-top:20px;">
         <h3>Month-on-Month Deliveries</h3>
-        <div class="chart-wrap" style="height:220px;"><canvas id="chart-mom-deliveries"></canvas></div>
+        <div class="chart-wrap" style="height:300px;"><canvas id="chart-mom-deliveries"></canvas></div>
       </div>
       <div style="margin-top:24px;">
         <div style="padding:11px 20px 0;font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">⏳ Pending Ageing Snapshot</div>
@@ -1065,7 +1065,7 @@ async function loadSummary() {
         y:  { type: 'linear', position: 'left',  beginAtZero: true, title: { display: true, text: 'Shipments', color: '#4f8ef7' }, grid: { color: 'rgba(255,255,255,0.05)' } },
         y1: { type: 'linear', position: 'right', beginAtZero: true, title: { display: true, text: 'Units',     color: '#38a169' }, grid: { drawOnChartArea: false } },
       },
-      layout: { padding: { top: 8 } },
+      layout: { padding: { top: 28 } },
       plugins: { ...CHART_DEFAULTS.plugins,
         legend: { position: 'bottom', labels: { font: { size: 12 } } },
         datalabels: {
