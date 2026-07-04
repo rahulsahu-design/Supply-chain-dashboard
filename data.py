@@ -20,6 +20,7 @@ STATUS_COL = "Current Status - Ship partner portal"
 DELIVERED_STATUSES = {"Delivered"}
 OVERDUE_BUCKETS = {"21-30", "30+", "31-40", "40+"}
 EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "Abandon"}
+SCORECARD_EXCLUDE_STATUSES = {"Abandon", "Cancelled", "Cancel", "RTO", "RTS", "Claims"}
 XINDUS = "Xindus Air + Sea"
 PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
 PROM_TAT_DEFAULT = 12
@@ -745,6 +746,8 @@ def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
 
 def transporter_scorecard(df: pd.DataFrame) -> list:
     df = df[df["Transporter"].notna() & (df["Transporter"].str.strip() != "")].copy()
+    if STATUS_COL in df.columns:
+        df = df[~df[STATUS_COL].str.strip().isin(SCORECARD_EXCLUDE_STATUSES)]
     grouped = df.groupby("Transporter").agg(
         total=("Shipment AWB", "count"),
         delivered=("is_delivered", "sum"),
