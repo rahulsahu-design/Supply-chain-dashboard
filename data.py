@@ -750,13 +750,16 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
         delivered=("is_delivered", "sum"),
         avg_actual_tat=("Actual TAT", "mean"),
         avg_prom_tat=("Prom TAT", "mean"),
-        avg_delay=("Delay Days", "mean"),
     ).reset_index()
 
+    # avg_delay and on_time_pct computed from delivered shipments only — undelivered rows
+    # have Delay Days = 0 or negative (shipment not yet late) which falsely shows "On Time"
+    # for transporters with no actual deliveries.
     del_df = df[df["is_delivered"] & df["Delay Days"].notna()].copy()
     on_time_grp = del_df.groupby("Transporter").agg(
         on_time=("Delay Days", lambda x: (x <= 0).sum()),
         tat_count=("Delay Days", "count"),
+        avg_delay=("Delay Days", "mean"),
     ).reset_index()
 
     grouped = grouped.merge(on_time_grp, on="Transporter", how="left")
