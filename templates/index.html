@@ -147,6 +147,13 @@
         </div>
         <div class="chart-wrap" style="height:300px;padding:12px 16px;box-sizing:border-box;"><canvas id="chart-mom-deliveries"></canvas></div>
       </div>
+      <div class="card" style="margin-top:20px;padding:0;overflow:hidden;">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border-light);">
+          <h3 style="margin:0;">Month-on-Month Shipment Value</h3>
+        </div>
+        <div class="chart-wrap" style="height:300px;padding:12px 16px;box-sizing:border-box;"><canvas id="chart-mom-shipment-value"></canvas></div>
+      </div>
+
       <div style="margin-top:24px;">
         <div style="padding:11px 20px 0;font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">⏳ Pending Ageing Snapshot</div>
         <div class="kpi-grid" id="daily-ageing-kpis" style="margin:12px 0 4px;"></div>
@@ -451,7 +458,7 @@
       </div>
       <div class="chart-row" style="margin-bottom:24px;">
         <div class="card">
-          <h3>Volumetric Weight (kg) by Month</h3>
+          <h3>Chargeable Weight (kg) by Month</h3>
           <div class="chart-wrap" style="height:220px;"><canvas id="chart-tonnage-vol"></canvas></div>
         </div>
         <div class="card">
@@ -806,12 +813,13 @@ function renderMomChart(data) {
         listeners: {
           enter(ctx, evt) {
             const ne = evt.native, row = data[ctx.dataIndex];
+            const totalShipped = (row.delivered_units || 0) + (row.undelivered_units || 0);
             if (ctx.datasetIndex === 0) {
-              _momTip.innerHTML = `<div style="font-weight:700;color:#4ade80;">${row.month} · Delivered: ${fmtNum(row.delivered_units)} units</div>`;
+              _momTip.innerHTML = `<div style="font-weight:700;color:#4ade80;">${row.month} · Delivered: ${fmtNum(row.delivered_units)} units</div><div style="margin-top:6px;color:#94a3b8;">Total shipped this month: <strong style="color:#f8fafc;">${fmtNum(totalShipped)}</strong> units</div>`;
               _momTip.style.display = 'block'; _placeMomTip(ne); return;
             }
             const entries = Object.entries(row.undelivered_by_status || {}).sort((a,b) => b[1]-a[1]);
-            let html = `<div style="font-weight:700;margin-bottom:8px;color:#fb923c;">${row.month} · Undelivered: ${fmtNum(row.undelivered_units)} units</div>`;
+            let html = `<div style="font-weight:700;margin-bottom:8px;color:#fb923c;">${row.month} · Undelivered: ${fmtNum(row.undelivered_units)} units</div><div style="margin-bottom:8px;color:#94a3b8;">Total shipped this month: <strong style="color:#f8fafc;">${fmtNum(totalShipped)}</strong> units</div>`;
             entries.forEach(([s,u]) => { html += `<div style="display:flex;justify-content:space-between;gap:16px;"><span style="color:#94a3b8;">${s}</span><span style="font-weight:600;">${fmtNum(u)}</span></div>`; });
             html += `<div style="margin-top:8px;font-size:10px;color:#fb923c;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">↗ Click number to view in Raw Data</div>`;
             _momTip.innerHTML = html; _momTip.style.display = 'block'; _placeMomTip(ne);
@@ -1185,6 +1193,30 @@ async function loadSummary() {
     renderMomChart(_momData);
   }
 
+  // MoM Shipment Value chart
+  const svRes = await apiFetch('/api/monthly-shipment-value');
+  const svData = await svRes.json();
+  if (svData && svData.length) {
+    getChart('chart-mom-shipment-value', 'bar', {
+      labels: svData.map(r => r.month),
+      datasets: [{ label: 'Shipment Value (₹)', data: svData.map(r => r.shipment_value), backgroundColor: '#805ad5' }]
+    }, { ...CHART_DEFAULTS,
+      scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.04)' } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, title: { display: true, text: 'Value (₹)', color: '#555' } },
+      },
+      layout: { padding: { top: 28 } },
+      plugins: { ...CHART_DEFAULTS.plugins,
+        datalabels: {
+          display: true, anchor: 'end', align: 'top',
+          color: '#553c9a',
+          font: { size: 11, weight: '700' },
+          formatter: (value) => value > 0 ? '₹' + fmtNum(Math.round(value)) : '',
+        }
+      }
+    });
+  }
+
   // Pending ageing snapshot
   const dailyAgeingRes = await apiFetch('/api/ageing');
   const dailyAgeing = await dailyAgeingRes.json();
@@ -1242,7 +1274,7 @@ async function loadDailyTonnage() {
     <th style="text-align:right;">Shipments</th>
     <th style="text-align:right;">Delivered</th>
     <th style="text-align:right;">On Time %</th>
-    <th style="text-align:right;">Vol. Wt (kg)</th>
+    <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
     <th style="text-align:right;">Boxes</th>
   </tr></thead><tbody>`;
@@ -1913,7 +1945,7 @@ async function loadTonnage() {
   if (rows.length) {
     getChart('chart-tonnage-vol', 'bar', {
       labels: rows.map(r => r.month),
-      datasets: [{ label: 'Vol. Weight (kg)', data: rows.map(r => r.vol_wt), backgroundColor: '#4f8ef7' }]
+      datasets: [{ label: 'Chargeable Wt (kg)', data: rows.map(r => r.vol_wt), backgroundColor: '#4f8ef7' }]
     }, { ...CHART_DEFAULTS, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } });
 
     getChart('chart-tonnage-units', 'bar', {
@@ -1938,7 +1970,7 @@ async function loadTonnage() {
   let html = `<table class="pivot-table"><thead><tr>
     <th>Month</th>
     <th style="text-align:right;">Shipments</th>
-    <th style="text-align:right;">Vol. Weight (kg)</th>
+    <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
     <th style="text-align:right;">Boxes</th>
   </tr></thead><tbody>`;

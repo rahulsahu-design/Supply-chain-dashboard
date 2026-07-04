@@ -107,7 +107,7 @@ def _do_fetch():
                 parsed[failed] = parsed3
             df[col] = parsed
 
-    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "Vol. Wt", "No. Of box"]:
+    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "Chargeable weight", "No. Of box"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -805,6 +805,33 @@ def monthly_deliveries(df: pd.DataFrame) -> list:
     return result
 
 
+def monthly_shipment_value(df: pd.DataFrame) -> list:
+    MONTHS = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"]
+    if "Pick up Date" in df.columns:
+        derived = df["Pick up Date"].dt.month.map(
+            lambda n: MONTHS[int(n)-1] if pd.notna(n) else None
+        )
+        month_col = df["Month"].astype(str).str.strip().replace("", pd.NA).replace("nan", pd.NA)
+        df = df.copy()
+        df["_month_eff"] = month_col.combine_first(derived)
+    else:
+        df = df.copy()
+        df["_month_eff"] = df["Month"].astype(str).str.strip()
+    result = []
+    for m in MONTHS:
+        mdf = df[df["_month_eff"] == m]
+        if not len(mdf):
+            continue
+        value = float(mdf["Shipment Value"].fillna(0).sum()) if "Shipment Value" in df.columns else 0
+        result.append({
+            "month": m[:3],
+            "month_full": m,
+            "shipment_value": round(value, 2),
+        })
+    return result
+
+
 def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
     MONTHS = ["January","February","March","April","May","June",
               "July","August","September","October","November","December"]
@@ -825,7 +852,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
             "shipments": len(mdf),
             "delivered": delivered,
             "on_time_pct": on_time_pct,
-            "vol_wt": round(float(mdf["Vol. Wt"].fillna(0).sum()), 1) if "Vol. Wt" in mdf.columns else 0,
+            "vol_wt": round(float(mdf["Chargeable weight"].fillna(0).sum()), 1) if "Chargeable weight" in mdf.columns else 0,
             "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
             "boxes": int(mdf["No. Of box"].fillna(0).sum()) if "No. Of box" in mdf.columns else 0,
         })
