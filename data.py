@@ -25,6 +25,25 @@ XINDUS = "Xindus Air + Sea"
 PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
 PROM_TAT_DEFAULT = 12
 
+_CHARGEABLE_COL_CANDIDATES = [
+    "Chargeable weight", "Chargeable Weight", "Chargeable Wt", "Chargeable Wt.",
+    "chargeable weight", "chargeable_weight",
+]
+_MODE_COL_CANDIDATES = ["mode", "Mode", "MODE", "Transport Mode", "transport mode"]
+
+def _chargeable_col(df):
+    for name in _CHARGEABLE_COL_CANDIDATES:
+        if name in df.columns:
+            return name
+    return None
+
+def _mode_col(df):
+    for name in _MODE_COL_CANDIDATES:
+        if name in df.columns:
+            return name
+    return None
+
+
 _cache = {"df": None, "fetched_at": None}
 CACHE_TTL_SECONDS = 1800  # 30 minutes
 
@@ -108,9 +127,12 @@ def _do_fetch():
                 parsed[failed] = parsed3
             df[col] = parsed
 
-    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "Chargeable weight", "No. Of box", "Shipment Value"]:
+    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "No. Of box", "Shipment Value"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+    cw = _chargeable_col(df)
+    if cw:
+        df[cw] = pd.to_numeric(df[cw], errors="coerce")
 
     if "Prom TAT" in df.columns and "Transporter" in df.columns:
         prom_null = df["Prom TAT"].isna()
@@ -844,6 +866,8 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
     d = df.copy()
     if transporters:
         d = d[d["Transporter"].str.strip().isin(transporters)]
+    cw_col   = _chargeable_col(d)
+    mode_col = _mode_col(d)
     rows = []
     for m in MONTHS:
         mdf = d[d["Month"].astype(str).str.strip() == m]
@@ -853,14 +877,29 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
         del_df = mdf[mdf["is_delivered"] & mdf["Delay Days"].notna()]
         tat_count = len(del_df)
         on_time_pct = round(float((del_df["Delay Days"] <= 0).sum()) / tat_count * 100, 1) if tat_count > 0 else None
+        chargeable = round(float(mdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
+
+        mode_air_pct = mode_air_sea_pct = mode_sea_pct = None
+        if mode_col and cw_col and chargeable > 0:
+            mode_norm = mdf[mode_col].astype(str).str.strip().str.lower().str.replace(r'\s*\+\s*', '+', regex=True)
+            air_wt     = float(mdf[mode_norm == 'air'][cw_col].fillna(0).sum())
+            air_sea_wt = float(mdf[mode_norm == 'air+sea'][cw_col].fillna(0).sum())
+            sea_wt     = float(mdf[mode_norm == 'sea'][cw_col].fillna(0).sum())
+            mode_air_pct     = round(air_wt / chargeable * 100, 1)
+            mode_air_sea_pct = round(air_sea_wt / chargeable * 100, 1)
+            mode_sea_pct     = round(sea_wt / chargeable * 100, 1)
+
         rows.append({
             "month": m[:3],
             "shipments": len(mdf),
             "delivered": delivered,
             "on_time_pct": on_time_pct,
-            "vol_wt": round(float(mdf["Chargeable weight"].fillna(0).sum()), 1) if "Chargeable weight" in mdf.columns else 0,
+            "vol_wt": chargeable,
             "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
             "boxes": int(mdf["No. Of box"].fillna(0).sum()) if "No. Of box" in mdf.columns else 0,
+            "mode_air_pct": mode_air_pct,
+            "mode_air_sea_pct": mode_air_sea_pct,
+            "mode_sea_pct": mode_sea_pct,
         })
     all_transporters = sorted(
         df["Transporter"].dropna().str.strip().replace("", pd.NA).dropna().unique().tolist()
