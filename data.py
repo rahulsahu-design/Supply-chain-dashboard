@@ -107,7 +107,7 @@ def _do_fetch():
                 parsed[failed] = parsed3
             df[col] = parsed
 
-    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "Chargeable weight", "No. Of box"]:
+    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "Chargeable weight", "No. Of box", "Shipment Value"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 

@@ -1194,27 +1194,31 @@ async function loadSummary() {
   }
 
   // MoM Shipment Value chart
-  const svRes = await apiFetch('/api/monthly-shipment-value');
-  const svData = await svRes.json();
-  if (svData && svData.length) {
-    getChart('chart-mom-shipment-value', 'bar', {
-      labels: svData.map(r => r.month),
-      datasets: [{ label: 'Shipment Value (₹)', data: svData.map(r => r.shipment_value), backgroundColor: '#805ad5' }]
-    }, { ...CHART_DEFAULTS,
-      scales: {
-        x: { grid: { color: 'rgba(0,0,0,0.04)' } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, title: { display: true, text: 'Value (₹)', color: '#555' } },
-      },
-      layout: { padding: { top: 28 } },
-      plugins: { ...CHART_DEFAULTS.plugins,
-        datalabels: {
-          display: true, anchor: 'end', align: 'top',
-          color: '#553c9a',
-          font: { size: 11, weight: '700' },
-          formatter: (value) => value > 0 ? '₹' + fmtNum(Math.round(value)) : '',
+  try {
+    const svRes = await apiFetch('/api/monthly-shipment-value');
+    const svData = await svRes.json();
+    if (svData && svData.length) {
+      getChart('chart-mom-shipment-value', 'bar', {
+        labels: svData.map(r => r.month),
+        datasets: [{ label: 'Shipment Value (₹)', data: svData.map(r => r.shipment_value), backgroundColor: '#805ad5' }]
+      }, { ...CHART_DEFAULTS,
+        scales: {
+          x: { grid: { color: 'rgba(0,0,0,0.04)' } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, title: { display: true, text: 'Value (₹)', color: '#555' } },
+        },
+        layout: { padding: { top: 28 } },
+        plugins: { ...CHART_DEFAULTS.plugins,
+          datalabels: {
+            display: true, anchor: 'end', align: 'top',
+            color: '#553c9a',
+            font: { size: 11, weight: '700' },
+            formatter: (value) => value > 0 ? '₹' + fmtNum(Math.round(value)) : '',
+          }
         }
-      }
-    });
+      });
+    }
+  } catch (e) {
+    console.warn('Shipment value chart failed to load:', e);
   }
 
   // Pending ageing snapshot
