@@ -1324,7 +1324,6 @@ async function loadDailyTonnage() {
   const tTotalDelivered = tRows.reduce((s, r) => s + r.delivered, 0);
   const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
   const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
-  const tTotalBoxes     = tRows.reduce((s, r) => s + r.boxes, 0);
   const tTotalShipVal   = tRows.reduce((s, r) => s + (r.shipment_value || 0), 0);
   const _otBadge  = pct => pct == null ? '—'
     : `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(pct)}%</span>`;
@@ -1340,7 +1339,6 @@ async function loadDailyTonnage() {
     <th style="text-align:right;">On Time %</th>
     <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
-    <th style="text-align:right;">Boxes</th>
     <th style="text-align:right;">Shipment Value ($)</th>
     ${hasMode ? '<th style="text-align:right;min-width:70px;">Air %</th><th style="text-align:right;min-width:80px;">Air+Sea %</th><th style="text-align:right;min-width:70px;">Sea %</th>' : ''}
   </tr></thead><tbody>`;
@@ -1353,7 +1351,6 @@ async function loadDailyTonnage() {
       <td style="text-align:right;">${_otBadge(r.on_time_pct)}</td>
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
-      <td style="text-align:right;">${fmtNum(r.boxes)}</td>
       <td style="text-align:right;">${r.shipment_value > 0 ? '$' + fmtNum(Math.round(r.shipment_value)) : '—'}</td>
       ${hasMode ? `<td style="text-align:right;">${_modePct(r.mode_air_pct)}</td><td style="text-align:right;">${_modePct(r.mode_air_sea_pct)}</td><td style="text-align:right;">${_modePct(r.mode_sea_pct)}</td>` : ''}
     </tr>`;
@@ -1366,7 +1363,6 @@ async function loadDailyTonnage() {
     <td style="text-align:right;">—</td>
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
-    <td style="text-align:right;">${fmtNum(tTotalBoxes)}</td>
     <td style="text-align:right;">${tTotalShipVal > 0 ? '$' + fmtNum(Math.round(tTotalShipVal)) : '—'}</td>
     ${hasMode ? '<td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td>' : ''}
   </tr></tfoot></table>`;
@@ -2095,7 +2091,6 @@ async function loadTonnage() {
   const totalDelivered  = rows.reduce((s, r) => s + r.delivered, 0);
   const totalVolWt      = rows.reduce((s, r) => s + r.vol_wt, 0);
   const totalUnits      = rows.reduce((s, r) => s + r.units, 0);
-  const totalBoxes      = rows.reduce((s, r) => s + r.boxes, 0);
   const totalShipVal    = rows.reduce((s, r) => s + (r.shipment_value || 0), 0);
   const _tDrBadge = (del, total) => { if (!total) return '—'; const pct = del / total * 100; return `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${pct.toFixed(1)}%</span>`; };
   let html = `<table class="pivot-table"><thead><tr>
@@ -2105,7 +2100,6 @@ async function loadTonnage() {
     <th style="text-align:right;">Delivery Rate</th>
     <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
-    <th style="text-align:right;">Boxes</th>
     <th style="text-align:right;">Shipment Value ($)</th>
   </tr></thead><tbody>`;
   rows.forEach(r => {
@@ -2116,7 +2110,6 @@ async function loadTonnage() {
       <td style="text-align:right;">${_tDrBadge(r.delivered, r.shipments)}</td>
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
-      <td style="text-align:right;">${fmtNum(r.boxes)}</td>
       <td style="text-align:right;">${r.shipment_value > 0 ? '$' + fmtNum(Math.round(r.shipment_value)) : '—'}</td>
     </tr>`;
   });
@@ -2127,7 +2120,6 @@ async function loadTonnage() {
     <td style="text-align:right;">${_tDrBadge(totalDelivered, totalShipments)}</td>
     <td style="text-align:right;">${fmtNum(totalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(totalUnits)}</td>
-    <td style="text-align:right;">${fmtNum(totalBoxes)}</td>
     <td style="text-align:right;">${totalShipVal > 0 ? '$' + fmtNum(Math.round(totalShipVal)) : '—'}</td>
   </tr></tfoot></table>`;
   document.getElementById('tonnage-table-wrap').innerHTML = html;
