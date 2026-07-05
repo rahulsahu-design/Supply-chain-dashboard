@@ -794,13 +794,14 @@ function _placeMomTip(ne) {
   _momTip.style.left = (ne.clientX+14+tw > window.innerWidth-8  ? ne.clientX-tw-14 : ne.clientX+14) + 'px';
   _momTip.style.top  = (ne.clientY-10+th > window.innerHeight-8 ? ne.clientY-th    : ne.clientY-10) + 'px';
 }
+const _MOM_TERMINAL_STATUSES = ['Abandon', 'RTS', 'Claims'];
 function renderMomChart(data) {
   if (!data || !data.length) return;
   getChart('chart-mom-deliveries', 'bar', {
     labels: data.map(r => r.month),
     datasets: [
-      { label: 'Delivered Units',   data: data.map(r => r.delivered_units),   backgroundColor: '#38a169' },
-      { label: 'Undelivered Units', data: data.map(r => r.undelivered_units), backgroundColor: '#f97316' },
+      { label: 'Delivered Units',          data: data.map(r => r.delivered_units),   backgroundColor: '#38a169' },
+      { label: 'Abandon / RTS / Claims',   data: data.map(r => r.undelivered_units), backgroundColor: '#f97316' },
     ]
   }, { ...CHART_DEFAULTS,
     scales: {
@@ -812,7 +813,7 @@ function renderMomChart(data) {
       if (!elements.length) return;
       const el = elements[0];
       if (el.datasetIndex !== 1) return;
-      navigateToRawData({ statusGroup: 'undelivered', month: data[el.index].month_full });
+      navigateToRawData({ statuses: _MOM_TERMINAL_STATUSES, label: 'Abandon/RTS/Claims', month: data[el.index].month_full });
     },
     onHover(evt, elements) {
       evt.native.target.style.cursor = (elements.length && elements[0].datasetIndex === 1) ? 'pointer' : 'default';
@@ -822,7 +823,7 @@ function renderMomChart(data) {
         position: 'bottom',
         labels: { font: { size: 12 } },
         onClick(e, legendItem, legend) {
-          if (legendItem.datasetIndex === 1) navigateToRawData({ statusGroup: 'undelivered' });
+          if (legendItem.datasetIndex === 1) navigateToRawData({ statuses: _MOM_TERMINAL_STATUSES, label: 'Abandon/RTS/Claims' });
           else Chart.defaults.plugins.legend.onClick.call(legend, e, legendItem, legend);
         }
       },
@@ -835,22 +836,26 @@ function renderMomChart(data) {
         listeners: {
           enter(ctx, evt) {
             const ne = evt.native, row = data[ctx.dataIndex];
-            const totalShipped = (row.delivered_units || 0) + (row.undelivered_units || 0);
+            const totalSent = row.total_units || ((row.delivered_units || 0) + (row.undelivered_units || 0));
             if (ctx.datasetIndex === 0) {
-              _momTip.innerHTML = `<div style="font-weight:700;color:#4ade80;">${row.month} · Delivered: ${fmtNum(row.delivered_units)} units</div><div style="margin-top:6px;color:#94a3b8;">Total shipped this month: <strong style="color:#f8fafc;">${fmtNum(totalShipped)}</strong> units</div>`;
+              _momTip.innerHTML = `<div style="font-weight:700;color:#4ade80;">${row.month} · Delivered: ${fmtNum(row.delivered_units)} units</div><div style="margin-top:6px;color:#94a3b8;">Total units sent this month: <strong style="color:#f8fafc;">${fmtNum(totalSent)}</strong></div>`;
               _momTip.style.display = 'block'; _placeMomTip(ne); return;
             }
             const entries = Object.entries(row.undelivered_by_status || {}).sort((a,b) => b[1]-a[1]);
-            let html = `<div style="font-weight:700;margin-bottom:8px;color:#fb923c;">${row.month} · Undelivered: ${fmtNum(row.undelivered_units)} units</div><div style="margin-bottom:8px;color:#94a3b8;">Total shipped this month: <strong style="color:#f8fafc;">${fmtNum(totalShipped)}</strong> units</div>`;
-            entries.forEach(([s,u]) => { html += `<div style="display:flex;justify-content:space-between;gap:16px;"><span style="color:#94a3b8;">${s}</span><span style="font-weight:600;">${fmtNum(u)}</span></div>`; });
-            html += `<div style="margin-top:8px;font-size:10px;color:#fb923c;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">↗ Click number to view in Raw Data</div>`;
+            let html = `<div style="font-weight:700;margin-bottom:6px;color:#fb923c;">${row.month} · Abandon / RTS / Claims: ${fmtNum(row.undelivered_units)} units</div>`;
+            html += `<div style="margin-bottom:8px;color:#94a3b8;">Total units sent this month: <strong style="color:#f8fafc;">${fmtNum(totalSent)}</strong></div>`;
+            if (entries.length) {
+              html += `<div style="border-top:1px solid rgba(255,255,255,0.12);padding-top:7px;margin-bottom:4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Breakdown</div>`;
+              entries.forEach(([s,u]) => { html += `<div style="display:flex;justify-content:space-between;gap:20px;"><span style="color:#cbd5e1;">${s}</span><span style="font-weight:700;color:#f8fafc;">${fmtNum(u)}</span></div>`; });
+            }
+            html += `<div style="margin-top:8px;font-size:10px;color:#fb923c;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">↗ Click to view in Raw Data</div>`;
             _momTip.innerHTML = html; _momTip.style.display = 'block'; _placeMomTip(ne);
             ne.target.style.cursor = 'pointer';
           },
           leave(ctx, evt) { _momTip.style.display = 'none'; evt.native.target.style.cursor = 'default'; },
           click(ctx, evt) {
             if (ctx.datasetIndex !== 1) return;
-            navigateToRawData({ statusGroup: 'undelivered', month: data[ctx.dataIndex].month_full });
+            navigateToRawData({ statuses: _MOM_TERMINAL_STATUSES, label: 'Abandon/RTS/Claims', month: data[ctx.dataIndex].month_full });
           }
         }
       }
@@ -1301,11 +1306,13 @@ async function loadDailyTonnage() {
     : `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(pct)}%</span>`;
   const _modePct  = pct => pct == null ? '<span style="color:var(--text-300);">—</span>'
     : `<span style="font-weight:600;">${fmtFloat(pct)}%</span>`;
+  const _drBadge  = (del, total) => { if (!total) return '—'; const pct = del / total * 100; return `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${pct.toFixed(1)}%</span>`; };
   const hasMode = tRows.some(r => r.mode_air_pct != null || r.mode_air_sea_pct != null || r.mode_sea_pct != null);
   let th = `<table class="pivot-table"><thead><tr>
     <th style="text-align:left;">Month</th>
     <th style="text-align:right;">Shipments</th>
     <th style="text-align:right;">Delivered</th>
+    <th style="text-align:right;">Delivery Rate</th>
     <th style="text-align:right;">On Time %</th>
     <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
@@ -1318,6 +1325,7 @@ async function loadDailyTonnage() {
       <td><strong>${r.month}</strong></td>
       <td style="text-align:right;">${fmtNum(r.shipments)}</td>
       <td style="text-align:right;">${fmtNum(r.delivered)}</td>
+      <td style="text-align:right;">${_drBadge(r.delivered, r.shipments)}</td>
       <td style="text-align:right;">${_otBadge(r.on_time_pct)}</td>
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
@@ -1330,6 +1338,7 @@ async function loadDailyTonnage() {
     <td>Total</td>
     <td style="text-align:right;">${fmtNum(tTotalShipments)}</td>
     <td style="text-align:right;">${fmtNum(tTotalDelivered)}</td>
+    <td style="text-align:right;">${_drBadge(tTotalDelivered, tTotalShipments)}</td>
     <td style="text-align:right;">—</td>
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
@@ -2058,14 +2067,18 @@ async function loadTonnage() {
     document.getElementById('tonnage-table-wrap').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-400);">No data for selected filters</div>';
     return;
   }
-  const totalShipments = rows.reduce((s, r) => s + r.shipments, 0);
-  const totalVolWt     = rows.reduce((s, r) => s + r.vol_wt, 0);
-  const totalUnits     = rows.reduce((s, r) => s + r.units, 0);
-  const totalBoxes     = rows.reduce((s, r) => s + r.boxes, 0);
-  const totalShipVal   = rows.reduce((s, r) => s + (r.shipment_value || 0), 0);
+  const totalShipments  = rows.reduce((s, r) => s + r.shipments, 0);
+  const totalDelivered  = rows.reduce((s, r) => s + r.delivered, 0);
+  const totalVolWt      = rows.reduce((s, r) => s + r.vol_wt, 0);
+  const totalUnits      = rows.reduce((s, r) => s + r.units, 0);
+  const totalBoxes      = rows.reduce((s, r) => s + r.boxes, 0);
+  const totalShipVal    = rows.reduce((s, r) => s + (r.shipment_value || 0), 0);
+  const _tDrBadge = (del, total) => { if (!total) return '—'; const pct = del / total * 100; return `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${pct.toFixed(1)}%</span>`; };
   let html = `<table class="pivot-table"><thead><tr>
     <th>Month</th>
     <th style="text-align:right;">Shipments</th>
+    <th style="text-align:right;">Delivered</th>
+    <th style="text-align:right;">Delivery Rate</th>
     <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
     <th style="text-align:right;">Boxes</th>
@@ -2075,6 +2088,8 @@ async function loadTonnage() {
     html += `<tr>
       <td><strong>${r.month}</strong></td>
       <td style="text-align:right;">${fmtNum(r.shipments)}</td>
+      <td style="text-align:right;">${fmtNum(r.delivered)}</td>
+      <td style="text-align:right;">${_tDrBadge(r.delivered, r.shipments)}</td>
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
       <td style="text-align:right;">${fmtNum(r.boxes)}</td>
@@ -2084,6 +2099,8 @@ async function loadTonnage() {
   html += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
     <td>Total</td>
     <td style="text-align:right;">${fmtNum(totalShipments)}</td>
+    <td style="text-align:right;">${fmtNum(totalDelivered)}</td>
+    <td style="text-align:right;">${_tDrBadge(totalDelivered, totalShipments)}</td>
     <td style="text-align:right;">${fmtNum(totalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(totalUnits)}</td>
     <td style="text-align:right;">${fmtNum(totalBoxes)}</td>

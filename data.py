@@ -835,17 +835,19 @@ def monthly_deliveries(df: pd.DataFrame, transporters=None) -> list:
     else:
         df = df.copy()
         df["_month_eff"] = df["Month"].astype(str).str.strip()
+    _TERMINAL_NEGATIVE = {"Abandon", "RTS", "Claims"}
     result = []
     for m in MONTHS:
         mdf = df[df["_month_eff"] == m]
         if not len(mdf):
             continue
         del_df   = mdf[mdf["is_delivered"]]
-        undel_df = mdf[_active_undelivered_mask(mdf)]
-        delivered_units   = int(del_df["Qty Sent"].fillna(0).sum())   if "Qty Sent" in df.columns else 0
-        undelivered_units = int(undel_df["Qty Sent"].fillna(0).sum()) if "Qty Sent" in df.columns else 0
+        term_df  = mdf[mdf[STATUS_COL].str.strip().isin(_TERMINAL_NEGATIVE)] if STATUS_COL in mdf.columns else mdf.iloc[0:0]
+        delivered_units   = int(del_df["Qty Sent"].fillna(0).sum())  if "Qty Sent" in df.columns else 0
+        undelivered_units = int(term_df["Qty Sent"].fillna(0).sum()) if "Qty Sent" in df.columns else 0
+        total_units       = int(mdf["Qty Sent"].fillna(0).sum())     if "Qty Sent" in df.columns else 0
         by_status = (
-            undel_df.groupby(STATUS_COL)["Qty Sent"].sum().fillna(0).astype(int).to_dict()
+            term_df.groupby(STATUS_COL)["Qty Sent"].sum().fillna(0).astype(int).to_dict()
             if "Qty Sent" in df.columns and STATUS_COL in df.columns else {}
         )
         result.append({
@@ -853,6 +855,7 @@ def monthly_deliveries(df: pd.DataFrame, transporters=None) -> list:
             "month_full": m,
             "delivered_units": delivered_units,
             "undelivered_units": undelivered_units,
+            "total_units": total_units,
             "undelivered_by_status": by_status,
         })
     return result
