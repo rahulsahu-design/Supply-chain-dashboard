@@ -165,7 +165,8 @@ def api_channel_health():
 
 @app.route("/api/terminal-status-counts")
 def api_terminal_status_counts():
-    return jsonify(d.terminal_status_counts(_df()))
+    year = request.args.get("year", "2026")
+    return jsonify(d.terminal_status_counts(_df(), year=year))
 
 
 @app.route("/api/trends")

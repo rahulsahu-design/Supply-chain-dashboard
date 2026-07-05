@@ -658,6 +658,23 @@ def tat_pivot(df: pd.DataFrame, channels=None, del_weeks=None, date_from=None, d
     }
 
 
+def _year_mask(df: pd.DataFrame, year_val: int):
+    """Mask for rows belonging to year_val.
+    Matches Year column == year_val OR (Year is blank AND Pick up Date year == year_val).
+    """
+    year_cleaned = pd.to_numeric(
+        df["Year"].astype(str).str.strip().str.replace(',', '', regex=False),
+        errors='coerce'
+    )
+    year_match = year_cleaned == year_val
+    year_blank = year_cleaned.isna()
+    if "Pick up Date" in df.columns:
+        pickup_match = df["Pick up Date"].dt.year == year_val
+    else:
+        pickup_match = pd.Series(False, index=df.index)
+    return year_match | (year_blank & pickup_match)
+
+
 def raw_data_2026(df: pd.DataFrame) -> dict:
     RAW_COLS = [
         "Shipment AWB", "Channel", "Transporter", "Product Name",
@@ -666,11 +683,7 @@ def raw_data_2026(df: pd.DataFrame) -> dict:
         "Ageing", "Ageing Bucket", STATUS_COL, "Qty Sent",
         "Year", "Month", "Week",
     ]
-    try:
-        cleaned = pd.to_numeric(df["Year"].astype(str).str.strip().str.replace(',', '', regex=False), errors='coerce')
-        d = df[cleaned == 2026].copy()
-    except Exception:
-        d = df[df["Year"].astype(str).str.strip() == "2026"].copy()
+    d = df[_year_mask(df, 2026)].copy()
 
     cols = [c for c in RAW_COLS if c in d.columns]
     out = d[cols].copy()
@@ -971,9 +984,14 @@ def monthly_trend(df: pd.DataFrame) -> list:
     return grouped[["month_label", "deliveries"]].to_dict(orient="records")
 
 
-def terminal_status_counts(df: pd.DataFrame) -> dict:
+def terminal_status_counts(df: pd.DataFrame, year=None) -> dict:
     if STATUS_COL not in df.columns:
         return {"groups": [], "total": 0}
+    if year and year != "All":
+        try:
+            df = df[_year_mask(df, int(float(str(year).strip())))]
+        except (ValueError, TypeError):
+            pass
     status_series = df[STATUS_COL].str.strip()
     result = []
     total = 0
