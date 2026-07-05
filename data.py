@@ -291,7 +291,7 @@ def daily_operations_summary(df: pd.DataFrame) -> dict:
 
     total = len(df)
     delivered = int(df["is_delivered"].sum())
-    undelivered = total - delivered
+    undelivered = int(_active_undelivered_mask(df).sum())
     overdue = int(df["is_overdue"].sum())
 
     # Today's pickups
@@ -815,7 +815,7 @@ def monthly_deliveries(df: pd.DataFrame) -> list:
         if not len(mdf):
             continue
         del_df   = mdf[mdf["is_delivered"]]
-        undel_df = mdf[~mdf["is_delivered"]]
+        undel_df = mdf[_active_undelivered_mask(mdf)]
         delivered_units   = int(del_df["Qty Sent"].fillna(0).sum())   if "Qty Sent" in df.columns else 0
         undelivered_units = int(undel_df["Qty Sent"].fillna(0).sum()) if "Qty Sent" in df.columns else 0
         by_status = (
