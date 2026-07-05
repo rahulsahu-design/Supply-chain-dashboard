@@ -2084,9 +2084,43 @@ function renderDelSku() {
   if (wrap) wrap.innerHTML = buildSkuTable(_delRows, 'Product Name', 'Qty Sent', 'Shipments', 'Units Delivered');
 }
 
+function buildUndelSkuTable(rows) {
+  if (!rows.length) return '<div style="padding:16px;color:var(--text-400);font-size:13px;">No data</div>';
+  const CHANNEL_ORDER = ['Amazon', 'TikTok', 'Shipbob'];
+  const channelSet = new Set(rows.map(r => r['Channel'] || '').filter(Boolean));
+  const channels = [...CHANNEL_ORDER.filter(c => channelSet.has(c)), ...[...channelSet].filter(c => !CHANNEL_ORDER.includes(c) && c)];
+  const skuMap = {};
+  rows.forEach(r => {
+    const prod = r['Product Name'] || '(unspecified)';
+    const ch   = r['Channel'] || '';
+    const qty  = Number(r['Qty Sent']) || 0;
+    if (!skuMap[prod]) skuMap[prod] = { count: 0, total: 0, by_channel: {} };
+    skuMap[prod].count++;
+    skuMap[prod].total += qty;
+    skuMap[prod].by_channel[ch] = (skuMap[prod].by_channel[ch] || 0) + qty;
+  });
+  const entries = Object.entries(skuMap).sort((a, b) => b[1].total - a[1].total);
+  const totShipments = entries.reduce((s, [, v]) => s + v.count, 0);
+  const totByChannel = {};
+  channels.forEach(ch => { totByChannel[ch] = entries.reduce((s, [, v]) => s + (v.by_channel[ch] || 0), 0); });
+  const totUnits = channels.reduce((s, ch) => s + totByChannel[ch], 0);
+  let html = `<table class="sku-table"><thead><tr>
+    <th>SKU / Product</th>
+    <th style="text-align:right;">Pending Shipments</th>
+    ${channels.map(ch => `<th style="text-align:right;">${escHtml(ch)}</th>`).join('')}
+    <th style="text-align:right;">Total</th>
+  </tr></thead><tbody>`;
+  entries.forEach(([prod, v]) => {
+    html += `<tr><td>${escHtml(prod)}</td><td style="text-align:right;">${v.count.toLocaleString()}</td>${channels.map(ch => `<td style="text-align:right;">${v.by_channel[ch] ? v.by_channel[ch].toLocaleString() : '—'}</td>`).join('')}<td style="text-align:right;"><strong>${v.total.toLocaleString()}</strong></td></tr>`;
+  });
+  html += `<tr class="sku-total-row"><td>Total</td><td style="text-align:right;">${totShipments.toLocaleString()}</td>${channels.map(ch => `<td style="text-align:right;">${totByChannel[ch] ? totByChannel[ch].toLocaleString() : '—'}</td>`).join('')}<td style="text-align:right;">${totUnits.toLocaleString()}</td></tr>`;
+  html += '</tbody></table>';
+  return html;
+}
+
 function renderUndelSku() {
   const wrap = document.getElementById('undel-sku-wrap');
-  if (wrap) wrap.innerHTML = buildSkuTable(_undelRows, 'Product Name', 'Qty Sent', 'Pending Shipments', 'Pending Units');
+  if (wrap) wrap.innerHTML = buildUndelSkuTable(_undelRows);
 }
 
 // ── Team Summary ──────────────────────────────────────────────────────────
