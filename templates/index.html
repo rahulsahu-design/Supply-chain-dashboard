@@ -2017,7 +2017,7 @@ function renderRawRows() {
   let rows = applyColFilters(_rawRows, rawCols, _tableFilters.raw);
   if (_rawNavFilter) {
     const STATUS_KEY = 'Current Status - Ship partner portal';
-    const DONE = new Set(['Delivered', 'RTO', 'Abandon']);
+    const DONE = new Set(['Delivered', 'RTO', 'RTS', 'Abandon', 'Cancelled', 'Cancel', 'Claims']);
     if (_rawNavFilter.statusGroup === 'undelivered') rows = rows.filter(r => !DONE.has(r[STATUS_KEY]));
     if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
     if (_rawNavFilter.month) {
