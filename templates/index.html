@@ -1665,16 +1665,21 @@ async function loadUndelivered() {
   if (to)   pivotExtra.set('to', to);
   if (year && year !== 'All') pivotExtra.set('undel_year', year);
 
-  const [res, pivotRes, ageingRes, termRes] = await Promise.all([
+  const [res, pivotRes, ageingRes] = await Promise.all([
     apiFetch('/api/undelivered', extra),
     apiFetch('/api/undelivered-pivot', pivotExtra),
     apiFetch('/api/ageing', pivotExtra),
-    apiFetch('/api/terminal-status-counts', pivotExtra),
   ]);
   const rows       = await res.json();
   const pivotData  = await pivotRes.json();
   const ageingData = await ageingRes.json();
-  const termData   = await termRes.json();
+
+  // Terminal status counts — fetched independently so failures don't break the tab
+  let termData = { groups: [], total: 0 };
+  try {
+    const termRes = await apiFetch('/api/terminal-status-counts');
+    termData = await termRes.json();
+  } catch (e) { console.warn('Terminal status counts failed to load:', e); }
 
   // KPIs
   const byChannel = {};
@@ -1746,24 +1751,33 @@ function clearUndeliveredFilters() {
   loadUndelivered();
 }
 
+let _termStatusGroups = [];
+
+function _navTerminal(idx) {
+  if (idx === -1) {
+    const all = _termStatusGroups.flatMap(g => g.statuses);
+    navigateToRawData({ statuses: all, label: 'All Terminal' });
+  } else {
+    const g = _termStatusGroups[idx];
+    if (g) navigateToRawData({ statuses: g.statuses, label: g.label });
+  }
+}
+
 function renderTerminalStatusCard(data) {
   const wrap = document.getElementById('terminal-status-card-wrap');
   if (!wrap) return;
   if (!data || !data.groups || !data.groups.length) { wrap.innerHTML = ''; return; }
-  const allStatuses = data.groups.flatMap(g => g.statuses);
-  const allFilter = JSON.stringify({ statuses: allStatuses, label: 'All Terminal' });
-  const rows = data.groups.map(g => {
-    const f = JSON.stringify({ statuses: g.statuses, label: g.label });
-    return `<div onclick="event.stopPropagation();navigateToRawData(${f.replace(/"/g,'&quot;')})"
+  _termStatusGroups = data.groups;
+  const rows = data.groups.map((g, i) => `
+    <div onclick="event.stopPropagation();_navTerminal(${i})"
          style="display:flex;justify-content:space-between;align-items:center;padding:7px 18px;border-top:1px solid #fca5a5;cursor:pointer;transition:background 0.12s;"
          onmouseover="this.style.background='#fff1f1'" onmouseout="this.style.background=''">
       <span style="font-size:13px;color:#7f1d1d;font-weight:500;">${g.label}</span>
       <span style="font-size:13px;font-weight:700;color:#b91c1c;">&#8212;&nbsp;${g.count.toLocaleString()}&nbsp;<span style="font-size:10px;opacity:0.6;">↗</span></span>
-    </div>`;
-  }).join('');
+    </div>`).join('');
   wrap.innerHTML = `
     <div style="display:inline-block;min-width:300px;max-width:420px;border-radius:10px;overflow:hidden;border:1px solid #fca5a5;background:#fff;">
-      <div onclick="navigateToRawData(${allFilter.replace(/"/g,'&quot;')})"
+      <div onclick="_navTerminal(-1)"
            style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:#fee2e2;cursor:pointer;transition:background 0.12s;"
            onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
         <span style="font-size:11px;font-weight:800;color:#991b1b;text-transform:uppercase;letter-spacing:0.6px;">Terminal Statuses</span>
@@ -2053,7 +2067,7 @@ function renderRawRows() {
     const STATUS_KEY = 'Current Status - Ship partner portal';
     const DONE = new Set(['Delivered', 'RTO', 'RTS', 'Abandon', 'Cancelled', 'Cancel', 'Claims']);
     if (_rawNavFilter.statusGroup === 'undelivered') rows = rows.filter(r => !DONE.has(r[STATUS_KEY]));
-    if (_rawNavFilter.statuses) { const _sf = new Set(_rawNavFilter.statuses); rows = rows.filter(r => _sf.has(r[STATUS_KEY])); }
+    if (_rawNavFilter.statuses) { const _sf = new Set(_rawNavFilter.statuses); rows = rows.filter(r => _sf.has((r[STATUS_KEY] || '').trim())); }
     if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
     if (_rawNavFilter.month) {
       const _MLIST = ["January","February","March","April","May","June","July","August","September","October","November","December"];
