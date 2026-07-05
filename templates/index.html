@@ -32,9 +32,6 @@
   <div class="nav-item" data-view="undelivered">
     <span class="nav-icon">🚚</span> Undelivered
   </div>
-  <div class="nav-item" data-view="tonnage">
-    <span class="nav-icon">⚖️</span> Monthly Tonnage &amp; Scorecard
-  </div>
 
   <div class="sidebar-section-label">Channels</div>
   <div class="nav-item" data-view="channel-health">
@@ -105,7 +102,45 @@
       <div class="kpi-grid" id="summary-kpis">
         <div class="loading-state"><div class="spinner"></div> Loading…</div>
       </div>
-      <div class="card" style="padding:0;overflow:hidden;margin-bottom:20px;">
+
+      <div style="margin-top:24px;">
+        <div style="padding:11px 20px 0;font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">⏳ Pending Ageing Snapshot</div>
+        <div class="kpi-grid" id="daily-ageing-kpis" style="margin:12px 0 4px;"></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;margin-top:8px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fee2e2;">
+          <span style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #ef4444;padding-left:10px;">⏳ Pending Units — Transporter × Ageing Bucket</span>
+        </div>
+        <div id="daily-ageing-pivot-wrap" style="overflow-x:auto;"></div>
+      </div>
+
+      <div class="card" style="margin-top:24px;padding:0;overflow:hidden;">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <h3 style="margin:0;">Month-on-Month Deliveries</h3>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+            <div class="ms-dropdown" id="ms-mom-transporter" data-all-label="All Transporters" style="min-width:150px;">
+              <button class="ms-trigger" type="button" onclick="toggleMs('ms-mom-transporter')" style="font-size:11px;padding:4px 10px;">
+                <span class="ms-label">All Transporters</span><span class="ms-caret">▾</span>
+              </button>
+              <div class="ms-panel" id="ms-mom-transporter-panel">
+                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mom-transporter',this)" checked> All</label>
+              </div>
+            </div>
+            <div class="ms-dropdown" id="ms-mom-months" data-all-label="All Months" style="min-width:140px;">
+              <button class="ms-trigger" type="button" onclick="toggleMs('ms-mom-months')" style="font-size:11px;padding:4px 10px;">
+                <span class="ms-label">All Months</span><span class="ms-caret">▾</span>
+              </button>
+              <div class="ms-panel" id="ms-mom-months-panel">
+                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mom-months',this)" checked> All</label>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="applyMomFilter()" style="font-size:11px;padding:4px 12px;">Apply</button>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:300px;padding:12px 16px;box-sizing:border-box;"><canvas id="chart-mom-deliveries"></canvas></div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;margin-top:24px;">
         <div style="padding:8px 14px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Tonnage Summary</span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
@@ -131,48 +166,6 @@
         <div id="daily-tonnage-table" style="overflow-x:auto;">
           <div class="loading-state"><div class="spinner"></div> Loading…</div>
         </div>
-      </div>
-      <div class="card" style="margin-top:20px;padding:0;overflow:hidden;">
-        <div style="padding:10px 16px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <h3 style="margin:0;">Month-on-Month Deliveries</h3>
-          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-            <div class="ms-dropdown" id="ms-mom-transporter" data-all-label="All Transporters" style="min-width:150px;">
-              <button class="ms-trigger" type="button" onclick="toggleMs('ms-mom-transporter')" style="font-size:11px;padding:4px 10px;">
-                <span class="ms-label">All Transporters</span><span class="ms-caret">▾</span>
-              </button>
-              <div class="ms-panel" id="ms-mom-transporter-panel">
-                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mom-transporter',this)" checked> All</label>
-              </div>
-            </div>
-            <div class="ms-dropdown" id="ms-mom-months" data-all-label="All Months" style="min-width:140px;">
-              <button class="ms-trigger" type="button" onclick="toggleMs('ms-mom-months')" style="font-size:11px;padding:4px 10px;">
-                <span class="ms-label">All Months</span><span class="ms-caret">▾</span>
-              </button>
-              <div class="ms-panel" id="ms-mom-months-panel">
-                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mom-months',this)" checked> All</label>
-              </div>
-            </div>
-            <button class="btn btn-primary" onclick="applyMomFilter()" style="font-size:11px;padding:4px 12px;">Apply</button>
-          </div>
-        </div>
-        <div class="chart-wrap" style="height:300px;padding:12px 16px;box-sizing:border-box;"><canvas id="chart-mom-deliveries"></canvas></div>
-      </div>
-      <div class="card" style="margin-top:20px;padding:0;overflow:hidden;">
-        <div style="padding:10px 16px;border-bottom:1px solid var(--border-light);">
-          <h3 style="margin:0;">Month-on-Month Shipment Value</h3>
-        </div>
-        <div class="chart-wrap" style="height:300px;padding:12px 16px;box-sizing:border-box;"><canvas id="chart-mom-shipment-value"></canvas></div>
-      </div>
-
-      <div style="margin-top:24px;">
-        <div style="padding:11px 20px 0;font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);">⏳ Pending Ageing Snapshot</div>
-        <div class="kpi-grid" id="daily-ageing-kpis" style="margin:12px 0 4px;"></div>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden;margin-top:8px;margin-bottom:24px;">
-        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fee2e2;">
-          <span style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #ef4444;padding-left:10px;">⏳ Pending Units — Transporter × Ageing Bucket</span>
-        </div>
-        <div id="daily-ageing-pivot-wrap" style="overflow-x:auto;"></div>
       </div>
 
       <!-- Transporter Scorecard -->
@@ -467,59 +460,6 @@
           </table>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- ── View: Tonnage ──────────────────────────────────────────────────── -->
-  <div class="view" id="view-tonnage">
-    <div class="page-header">
-      <div>
-        <h2>Monthly Tonnage &amp; Scorecard</h2>
-        <div class="subtitle" id="tonnage-subtitle">Carrier-wise volumetric weight, units &amp; boxes by month</div>
-      </div>
-    </div>
-    <div class="content-area">
-      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:20px;">
-        <label>Transporter</label>
-        <div class="ms-dropdown" id="ms-tonnage-transporter" data-all-label="All Transporters">
-          <button class="ms-trigger" type="button" onclick="toggleMs('ms-tonnage-transporter')">
-            <span class="ms-label">All Transporters</span><span class="ms-caret">▾</span>
-          </button>
-          <div class="ms-panel" id="ms-tonnage-transporter-panel">
-            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-tonnage-transporter',this)" checked> All</label>
-          </div>
-        </div>
-        <label>Month</label>
-        <div class="ms-dropdown" id="ms-tonnage-month" data-all-label="All Months">
-          <button class="ms-trigger" type="button" onclick="toggleMs('ms-tonnage-month')">
-            <span class="ms-label">All Months</span><span class="ms-caret">▾</span>
-          </button>
-          <div class="ms-panel" id="ms-tonnage-month-panel">
-            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-tonnage-month',this)" checked> All</label>
-          </div>
-        </div>
-        <button class="btn btn-primary" onclick="loadTonnage()">Apply</button>
-        <button class="gf-clear-btn" onclick="clearTonnageFilters()">✕ Clear</button>
-      </div>
-      <div class="chart-row" style="margin-bottom:24px;">
-        <div class="card">
-          <h3>Chargeable Weight (kg) by Month</h3>
-          <div class="chart-wrap" style="height:220px;"><canvas id="chart-tonnage-vol"></canvas></div>
-        </div>
-        <div class="card">
-          <h3>Units &amp; Boxes by Month</h3>
-          <div class="chart-wrap" style="height:220px;"><canvas id="chart-tonnage-units"></canvas></div>
-        </div>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);">
-          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Tonnage Summary</span>
-        </div>
-        <div id="tonnage-table-wrap" style="overflow-x:auto;">
-          <div class="loading-state"><div class="spinner"></div> Loading…</div>
-        </div>
-      </div>
-
     </div>
   </div>
 
@@ -1122,7 +1062,6 @@ function loadView(view, force) {
     case 'raw-data':       return loadRawData();
     case 'team-summary':   return loadTeamSummary();
     case 'summary-2025':   return loadSummary2025();
-    case 'tonnage':        return loadTonnage();
   }
 }
 
@@ -1217,34 +1156,6 @@ async function loadSummary() {
     });
     updateMsLabel('ms-mom-months');
     renderMomChart(_momData);
-  }
-
-  // MoM Shipment Value chart
-  try {
-    const svRes = await apiFetch('/api/monthly-shipment-value');
-    const svData = await svRes.json();
-    if (svData && svData.length) {
-      getChart('chart-mom-shipment-value', 'bar', {
-        labels: svData.map(r => r.month),
-        datasets: [{ label: 'Shipment Value ($)', data: svData.map(r => r.shipment_value), backgroundColor: '#805ad5' }]
-      }, { ...CHART_DEFAULTS,
-        scales: {
-          x: { grid: { color: 'rgba(0,0,0,0.04)' } },
-          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, title: { display: true, text: 'Value ($)', color: '#555' } },
-        },
-        layout: { padding: { top: 28 } },
-        plugins: { ...CHART_DEFAULTS.plugins,
-          datalabels: {
-            display: true, anchor: 'end', align: 'top',
-            color: '#553c9a',
-            font: { size: 11, weight: '700' },
-            formatter: (value) => value > 0 ? '$' + fmtNum(Math.round(value)) : '',
-          }
-        }
-      });
-    }
-  } catch (e) {
-    console.warn('Shipment value chart failed to load:', e);
   }
 
   // Pending ageing snapshot
@@ -2026,114 +1937,6 @@ async function loadChannelHealth() {
       </div>
     </div>
   `).join('');
-}
-
-// ── View: Tonnage ─────────────────────────────────────────────────────────
-let _tonnageTransporterOptions = [];
-let _tonnageMonthInited = false;
-
-async function loadTonnage() {
-  document.getElementById('tonnage-table-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
-
-  const transporters = getMsValues('ms-tonnage-transporter');
-  const months = getMsValues('ms-tonnage-month');
-  const extra = new URLSearchParams();
-  if (transporters.length) extra.set('transporters', transporters.join(','));
-  if (months.length) extra.set('months', months.join(','));
-
-  const res = await apiFetch('/api/tonnage', extra);
-  const data = await res.json();
-
-  // Populate transporter multi-select on first load
-  if (!_tonnageTransporterOptions.length && data.transporters && data.transporters.length) {
-    _tonnageTransporterOptions = data.transporters;
-    const panel = document.getElementById('ms-tonnage-transporter-panel');
-    data.transporters.forEach(t => {
-      panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${t}" onchange="msItemToggle('ms-tonnage-transporter',this)"> ${t}</label>`;
-    });
-  }
-  // Populate month multi-select on first load
-  if (!_tonnageMonthInited && data.all_months && data.all_months.length) {
-    _tonnageMonthInited = true;
-    const mPanel = document.getElementById('ms-tonnage-month-panel');
-    data.all_months.forEach(m => {
-      mPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${m}" onchange="msItemToggle('ms-tonnage-month',this)" checked> ${m.substring(0,3)}</label>`;
-    });
-  }
-
-  const rows = data.rows || [];
-  document.getElementById('tonnage-subtitle').textContent =
-    `${rows.length} month${rows.length !== 1 ? 's' : ''} of data · Carrier-wise summary`;
-
-  // Charts
-  if (rows.length) {
-    getChart('chart-tonnage-vol', 'bar', {
-      labels: rows.map(r => r.month),
-      datasets: [{ label: 'Chargeable Wt (kg)', data: rows.map(r => r.vol_wt), backgroundColor: '#4f8ef7' }]
-    }, { ...CHART_DEFAULTS, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } });
-
-    getChart('chart-tonnage-units', 'bar', {
-      labels: rows.map(r => r.month),
-      datasets: [
-        { label: 'Shipments', data: rows.map(r => r.shipments), backgroundColor: '#4f8ef7' },
-        { label: 'Units',     data: rows.map(r => r.units),     backgroundColor: '#38a169' },
-        { label: 'Boxes',     data: rows.map(r => r.boxes),     backgroundColor: '#d69e2e' },
-      ]
-    }, { ...CHART_DEFAULTS, scales: { x: { stacked: false, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } });
-  }
-
-  // Table
-  if (!rows.length) {
-    document.getElementById('tonnage-table-wrap').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-400);">No data for selected filters</div>';
-    return;
-  }
-  const totalShipments  = rows.reduce((s, r) => s + r.shipments, 0);
-  const totalDelivered  = rows.reduce((s, r) => s + r.delivered, 0);
-  const totalVolWt      = rows.reduce((s, r) => s + r.vol_wt, 0);
-  const totalUnits      = rows.reduce((s, r) => s + r.units, 0);
-  const totalShipVal    = rows.reduce((s, r) => s + (r.shipment_value || 0), 0);
-  const _tDrBadge = (del, total) => { if (!total) return '—'; const pct = del / total * 100; return `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${pct.toFixed(1)}%</span>`; };
-  let html = `<table class="pivot-table"><thead><tr>
-    <th>Month</th>
-    <th style="text-align:right;">Shipments</th>
-    <th style="text-align:right;">Delivered</th>
-    <th style="text-align:right;">Delivery Rate</th>
-    <th style="text-align:right;">Chargeable Wt (kg)</th>
-    <th style="text-align:right;">Units</th>
-    <th style="text-align:right;">Shipment Value ($)</th>
-  </tr></thead><tbody>`;
-  rows.forEach(r => {
-    html += `<tr>
-      <td><strong>${r.month}</strong></td>
-      <td style="text-align:right;">${fmtNum(r.shipments)}</td>
-      <td style="text-align:right;">${fmtNum(r.delivered)}</td>
-      <td style="text-align:right;">${_tDrBadge(r.delivered, r.shipments)}</td>
-      <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
-      <td style="text-align:right;">${fmtNum(r.units)}</td>
-      <td style="text-align:right;">${r.shipment_value > 0 ? '$' + fmtNum(Math.round(r.shipment_value)) : '—'}</td>
-    </tr>`;
-  });
-  html += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
-    <td>Total</td>
-    <td style="text-align:right;">${fmtNum(totalShipments)}</td>
-    <td style="text-align:right;">${fmtNum(totalDelivered)}</td>
-    <td style="text-align:right;">${_tDrBadge(totalDelivered, totalShipments)}</td>
-    <td style="text-align:right;">${fmtNum(totalVolWt)}</td>
-    <td style="text-align:right;">${fmtNum(totalUnits)}</td>
-    <td style="text-align:right;">${totalShipVal > 0 ? '$' + fmtNum(Math.round(totalShipVal)) : '—'}</td>
-  </tr></tfoot></table>`;
-  document.getElementById('tonnage-table-wrap').innerHTML = html;
-}
-
-function clearTonnageFilters() {
-  ['ms-tonnage-transporter', 'ms-tonnage-month'].forEach(id => {
-    const el = document.getElementById(id);
-    el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-    const allCb = el.querySelector('input[value="__all__"]');
-    if (allCb) allCb.checked = true;
-    updateMsLabel(id);
-  });
-  loadTonnage();
 }
 
 // ── View 9: Raw Data 2026 ────────────────────────────────────────────────
