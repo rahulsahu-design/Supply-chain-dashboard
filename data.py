@@ -835,21 +835,37 @@ def monthly_deliveries(df: pd.DataFrame, transporters=None) -> list:
     else:
         df = df.copy()
         df["_month_eff"] = df["Month"].astype(str).str.strip()
-    _TERMINAL_NEGATIVE = {"Abandon", "RTS", "Claims"}
+    _TRANSIT_EXCLUDE = DELIVERED_STATUSES | {"Abandon", "Claims", "RTO", "RTS", "Cancelled", "Cancel"}
     result = []
     for m in MONTHS:
         mdf = df[df["_month_eff"] == m]
         if not len(mdf):
             continue
-        del_df   = mdf[mdf["is_delivered"]]
-        term_df  = mdf[mdf[STATUS_COL].str.strip().isin(_TERMINAL_NEGATIVE)] if STATUS_COL in mdf.columns else mdf.iloc[0:0]
-        delivered_units   = int(del_df["Qty Sent"].fillna(0).sum())  if "Qty Sent" in df.columns else 0
-        undelivered_units = int(term_df["Qty Sent"].fillna(0).sum()) if "Qty Sent" in df.columns else 0
-        total_units       = int(mdf["Qty Sent"].fillna(0).sum())     if "Qty Sent" in df.columns else 0
-        by_status = (
-            term_df.groupby(STATUS_COL)["Qty Sent"].sum().fillna(0).astype(int).to_dict()
-            if "Qty Sent" in df.columns and STATUS_COL in df.columns else {}
-        )
+        del_df = mdf[mdf["is_delivered"]]
+        if STATUS_COL in mdf.columns:
+            st = mdf[STATUS_COL].str.strip()
+            abandon_df  = mdf[st.isin({"Abandon"})]
+            claims_df   = mdf[st.isin({"Claims"})]
+            rto_df      = mdf[st.isin({"RTO"})]
+            transit_df  = mdf[~st.isin(_TRANSIT_EXCLUDE) & (st != "")]
+        else:
+            abandon_df = claims_df = rto_df = transit_df = mdf.iloc[0:0]
+
+        def _qty(sub): return int(sub["Qty Sent"].fillna(0).sum()) if "Qty Sent" in df.columns else 0
+
+        delivered_units   = _qty(del_df)
+        abandon_units     = _qty(abandon_df)
+        claims_units      = _qty(claims_df)
+        rto_units         = _qty(rto_df)
+        transit_units     = _qty(transit_df)
+        undelivered_units = abandon_units + claims_units + rto_units + transit_units
+        total_units       = _qty(mdf)
+        by_status = {
+            "Abandon":    abandon_units,
+            "Claims":     claims_units,
+            "RTO":        rto_units,
+            "In-Transit": transit_units,
+        }
         result.append({
             "month": m[:3],
             "month_full": m,

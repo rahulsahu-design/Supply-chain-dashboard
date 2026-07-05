@@ -795,14 +795,13 @@ function _placeMomTip(ne) {
   _momTip.style.left = (ne.clientX+14+tw > window.innerWidth-8  ? ne.clientX-tw-14 : ne.clientX+14) + 'px';
   _momTip.style.top  = (ne.clientY-10+th > window.innerHeight-8 ? ne.clientY-th    : ne.clientY-10) + 'px';
 }
-const _MOM_TERMINAL_STATUSES = ['Abandon', 'RTS', 'Claims'];
 function renderMomChart(data) {
   if (!data || !data.length) return;
   getChart('chart-mom-deliveries', 'bar', {
     labels: data.map(r => r.month),
     datasets: [
-      { label: 'Delivered Units',          data: data.map(r => r.delivered_units),   backgroundColor: '#38a169' },
-      { label: 'Abandon / RTS / Claims',   data: data.map(r => r.undelivered_units), backgroundColor: '#f97316' },
+      { label: 'Delivered Units',    data: data.map(r => r.delivered_units),   backgroundColor: '#38a169' },
+      { label: 'Undelivered Units',  data: data.map(r => r.undelivered_units), backgroundColor: '#f97316' },
     ]
   }, { ...CHART_DEFAULTS,
     scales: {
@@ -814,7 +813,7 @@ function renderMomChart(data) {
       if (!elements.length) return;
       const el = elements[0];
       if (el.datasetIndex !== 1) return;
-      navigateToRawData({ statuses: _MOM_TERMINAL_STATUSES, label: 'Abandon/RTS/Claims', month: data[el.index].month_full });
+      navigateToRawData({ statusGroup: 'mom-undelivered', label: 'Undelivered', month: data[el.index].month_full });
     },
     onHover(evt, elements) {
       evt.native.target.style.cursor = (elements.length && elements[0].datasetIndex === 1) ? 'pointer' : 'default';
@@ -824,7 +823,7 @@ function renderMomChart(data) {
         position: 'bottom',
         labels: { font: { size: 12 } },
         onClick(e, legendItem, legend) {
-          if (legendItem.datasetIndex === 1) navigateToRawData({ statuses: _MOM_TERMINAL_STATUSES, label: 'Abandon/RTS/Claims' });
+          if (legendItem.datasetIndex === 1) navigateToRawData({ statusGroup: 'mom-undelivered', label: 'Undelivered' });
           else Chart.defaults.plugins.legend.onClick.call(legend, e, legendItem, legend);
         }
       },
@@ -842,9 +841,11 @@ function renderMomChart(data) {
               _momTip.innerHTML = `<div style="font-weight:700;color:#4ade80;">${row.month} · Delivered: ${fmtNum(row.delivered_units)} units</div><div style="margin-top:6px;color:#94a3b8;">Total units sent this month: <strong style="color:#f8fafc;">${fmtNum(totalSent)}</strong></div>`;
               _momTip.style.display = 'block'; _placeMomTip(ne); return;
             }
-            const entries = Object.entries(row.undelivered_by_status || {}).sort((a,b) => b[1]-a[1]);
-            let html = `<div style="font-weight:700;margin-bottom:6px;color:#fb923c;">${row.month} · Abandon / RTS / Claims: ${fmtNum(row.undelivered_units)} units</div>`;
+            const bs = row.undelivered_by_status || {};
+            const order = ['Abandon', 'Claims', 'In-Transit', 'RTO'];
+            let html = `<div style="font-weight:700;margin-bottom:6px;color:#fb923c;">${row.month} · Undelivered: ${fmtNum(row.undelivered_units)} units</div>`;
             html += `<div style="margin-bottom:8px;color:#94a3b8;">Total units sent this month: <strong style="color:#f8fafc;">${fmtNum(totalSent)}</strong></div>`;
+            const entries = order.filter(k => bs[k] > 0).map(k => [k, bs[k]]);
             if (entries.length) {
               html += `<div style="border-top:1px solid rgba(255,255,255,0.12);padding-top:7px;margin-bottom:4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Breakdown</div>`;
               entries.forEach(([s,u]) => { html += `<div style="display:flex;justify-content:space-between;gap:20px;"><span style="color:#cbd5e1;">${s}</span><span style="font-weight:700;color:#f8fafc;">${fmtNum(u)}</span></div>`; });
@@ -856,7 +857,7 @@ function renderMomChart(data) {
           leave(ctx, evt) { _momTip.style.display = 'none'; evt.native.target.style.cursor = 'default'; },
           click(ctx, evt) {
             if (ctx.datasetIndex !== 1) return;
-            navigateToRawData({ statuses: _MOM_TERMINAL_STATUSES, label: 'Abandon/RTS/Claims', month: data[ctx.dataIndex].month_full });
+            navigateToRawData({ statusGroup: 'mom-undelivered', label: 'Undelivered', month: data[ctx.dataIndex].month_full });
           }
         }
       }
@@ -2167,6 +2168,7 @@ function renderRawRows() {
     const STATUS_KEY = 'Current Status - Ship partner portal';
     const DONE = new Set(['Delivered', 'RTO', 'RTS', 'Abandon', 'Cancelled', 'Cancel', 'Claims']);
     if (_rawNavFilter.statusGroup === 'undelivered') rows = rows.filter(r => !DONE.has(r[STATUS_KEY]));
+    if (_rawNavFilter.statusGroup === 'mom-undelivered') { const _excl = new Set(['Delivered', 'RTS', 'Cancelled', 'Cancel']); rows = rows.filter(r => !_excl.has((r[STATUS_KEY]||'').trim())); }
     if (_rawNavFilter.statuses) { const _sf = new Set(_rawNavFilter.statuses); rows = rows.filter(r => _sf.has((r[STATUS_KEY] || '').trim())); }
     if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
     if (_rawNavFilter.month) {
@@ -2215,7 +2217,7 @@ function navigateToRawData(filter) {
   const badge = document.getElementById('raw-nav-filter-badge');
   if (badge) {
     const parts = [];
-    if (filter.statusGroup === 'undelivered') parts.push('Undelivered');
+    if (filter.statusGroup === 'undelivered' || filter.statusGroup === 'mom-undelivered') parts.push('Undelivered');
     if (filter.label) parts.push(filter.label);
     if (filter.channel) parts.push(filter.channel);
     badge.textContent = '✕ Filtered: ' + parts.join(' + ');
