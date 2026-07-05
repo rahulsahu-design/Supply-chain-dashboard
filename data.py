@@ -251,6 +251,10 @@ def get_filter_options(df: pd.DataFrame) -> dict:
         mask = _active_undelivered_mask(df)
         undel_statuses = sorted(df[mask][STATUS_COL].str.strip().dropna().replace("", pd.NA).dropna().unique().tolist())
 
+    transporters = sorted(
+        df["Transporter"].dropna().str.strip().replace("", pd.NA).dropna().unique().tolist()
+    ) if "Transporter" in df.columns else []
+
     return {
         "years": years, "months": months, "weeks": weeks, "del_weeks": del_weeks,
         "del_years": [str(y) for y in del_years],
@@ -258,6 +262,7 @@ def get_filter_options(df: pd.DataFrame) -> dict:
         "exp_del_years": [str(y) for y in exp_del_years],
         "max_delivery_date": max_del_date,
         "undel_statuses": undel_statuses,
+        "transporters": transporters,
     }
 
 
@@ -814,9 +819,11 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
     return grouped.fillna("").to_dict(orient="records")
 
 
-def monthly_deliveries(df: pd.DataFrame) -> list:
+def monthly_deliveries(df: pd.DataFrame, transporters=None) -> list:
     MONTHS = ["January","February","March","April","May","June",
               "July","August","September","October","November","December"]
+    if transporters and "Transporter" in df.columns:
+        df = df[df["Transporter"].str.strip().isin(transporters)].copy()
     # Derive month from pickup date for rows where Month column is blank
     if "Pick up Date" in df.columns:
         derived = df["Pick up Date"].dt.month.map(
@@ -878,7 +885,7 @@ def monthly_shipment_value(df: pd.DataFrame) -> list:
     return result
 
 
-def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
+def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
     MONTHS = ["January","February","March","April","May","June",
               "July","August","September","October","November","December"]
     d = df.copy()
@@ -886,8 +893,10 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
         d = d[d["Transporter"].str.strip().isin(transporters)]
     cw_col   = _chargeable_col(d)
     mode_col = _mode_col(d)
+    all_months = [m for m in MONTHS if len(d[d["Month"].astype(str).str.strip() == m]) > 0]
+    months_to_show = [m for m in MONTHS if m in months] if months else MONTHS
     rows = []
-    for m in MONTHS:
+    for m in months_to_show:
         mdf = d[d["Month"].astype(str).str.strip() == m]
         if len(mdf) == 0:
             continue
@@ -896,6 +905,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
         tat_count = len(del_df)
         on_time_pct = round(float((del_df["Delay Days"] <= 0).sum()) / tat_count * 100, 1) if tat_count > 0 else None
         chargeable = round(float(mdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
+        shipment_value = round(float(mdf["Shipment Value"].fillna(0).sum()), 2) if "Shipment Value" in mdf.columns else 0
 
         mode_air_pct = mode_air_sea_pct = mode_sea_pct = None
         if mode_col and cw_col and chargeable > 0:
@@ -913,6 +923,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
             "delivered": delivered,
             "on_time_pct": on_time_pct,
             "vol_wt": chargeable,
+            "shipment_value": shipment_value,
             "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
             "boxes": int(mdf["No. Of box"].fillna(0).sum()) if "No. Of box" in mdf.columns else 0,
             "mode_air_pct": mode_air_pct,
@@ -922,7 +933,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None) -> dict:
     all_transporters = sorted(
         df["Transporter"].dropna().str.strip().replace("", pd.NA).dropna().unique().tolist()
     )
-    return {"rows": rows, "transporters": all_transporters}
+    return {"rows": rows, "transporters": all_transporters, "all_months": all_months}
 
 
 def channel_health(df: pd.DataFrame) -> list:

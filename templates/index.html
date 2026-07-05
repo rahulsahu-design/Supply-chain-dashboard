@@ -117,6 +117,14 @@
                 <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-dt-transporter',this)" checked> All</label>
               </div>
             </div>
+            <div class="ms-dropdown" id="ms-dt-month" data-all-label="All Months" style="min-width:130px;">
+              <button class="ms-trigger" type="button" onclick="toggleMs('ms-dt-month')" style="font-size:11px;padding:4px 10px;">
+                <span class="ms-label">All Months</span><span class="ms-caret">▾</span>
+              </button>
+              <div class="ms-panel" id="ms-dt-month-panel">
+                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-dt-month',this)" checked> All</label>
+              </div>
+            </div>
             <button class="btn btn-primary" onclick="loadDailyTonnage()" style="font-size:11px;padding:4px 12px;">Apply</button>
           </div>
         </div>
@@ -128,6 +136,14 @@
         <div style="padding:10px 16px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <h3 style="margin:0;">Month-on-Month Deliveries</h3>
           <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+            <div class="ms-dropdown" id="ms-mom-transporter" data-all-label="All Transporters" style="min-width:150px;">
+              <button class="ms-trigger" type="button" onclick="toggleMs('ms-mom-transporter')" style="font-size:11px;padding:4px 10px;">
+                <span class="ms-label">All Transporters</span><span class="ms-caret">▾</span>
+              </button>
+              <div class="ms-panel" id="ms-mom-transporter-panel">
+                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mom-transporter',this)" checked> All</label>
+              </div>
+            </div>
             <div class="ms-dropdown" id="ms-mom-months" data-all-label="All Months" style="min-width:140px;">
               <button class="ms-trigger" type="button" onclick="toggleMs('ms-mom-months')" style="font-size:11px;padding:4px 10px;">
                 <span class="ms-label">All Months</span><span class="ms-caret">▾</span>
@@ -448,6 +464,15 @@
           </button>
           <div class="ms-panel" id="ms-tonnage-transporter-panel">
             <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-tonnage-transporter',this)" checked> All</label>
+          </div>
+        </div>
+        <label>Month</label>
+        <div class="ms-dropdown" id="ms-tonnage-month" data-all-label="All Months">
+          <button class="ms-trigger" type="button" onclick="toggleMs('ms-tonnage-month')">
+            <span class="ms-label">All Months</span><span class="ms-caret">▾</span>
+          </button>
+          <div class="ms-panel" id="ms-tonnage-month-panel">
+            <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-tonnage-month',this)" checked> All</label>
           </div>
         </div>
         <button class="btn btn-primary" onclick="loadTonnage()">Apply</button>
@@ -832,9 +857,23 @@ function renderMomChart(data) {
     }
   });
 }
-function applyMomFilter() {
-  const sel = getMsValues('ms-mom-months');
-  renderMomChart(sel.length ? _momData.filter(r => sel.includes(r.month)) : _momData);
+async function applyMomFilter() {
+  const monthsSel = getMsValues('ms-mom-months');
+  const transporters = getMsValues('ms-mom-transporter');
+  const extra = new URLSearchParams();
+  if (transporters.length) extra.set('transporters', transporters.join(','));
+  const res = await apiFetch('/api/monthly-deliveries', extra);
+  _momData = await res.json();
+  // Rebuild month dropdown preserving prior selection
+  const panel = document.getElementById('ms-mom-months-panel');
+  panel.innerHTML = `<label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mom-months',this)" checked> All</label>`;
+  _momData.forEach(r => {
+    const chk = !monthsSel.length || monthsSel.includes(r.month) ? 'checked' : '';
+    panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${r.month}" onchange="msItemToggle('ms-mom-months',this)" ${chk}> ${r.month}</label>`;
+  });
+  updateMsLabel('ms-mom-months');
+  const finalSel = getMsValues('ms-mom-months');
+  renderMomChart(finalSel.length ? _momData.filter(r => finalSel.includes(r.month)) : _momData);
 }
 
 // ── Global filters ───────────────────────────────────────────────────────
@@ -975,6 +1014,16 @@ async function loadFilterOptions() {
     if (el) el.value = '2026';
   });
   updateFilterBadge();
+
+  // Populate MoM Deliveries transporter dropdown
+  if (opts.transporters && opts.transporters.length) {
+    const momTPanel = document.getElementById('ms-mom-transporter-panel');
+    if (momTPanel) {
+      opts.transporters.forEach(t => {
+        momTPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${t}" onchange="msItemToggle('ms-mom-transporter',this)" checked> ${t}</label>`;
+      });
+    }
+  }
 }
 
 // ── Multi-select helpers ─────────────────────────────────────────────────────
@@ -1208,13 +1257,16 @@ async function loadSummary() {
 }
 
 let _dailyTonnageTransporterInited = false;
+let _dailyTonnageMonthInited = false;
 
 async function loadDailyTonnage() {
   document.getElementById('daily-tonnage-table').innerHTML =
     '<div class="loading-state" style="padding:20px;"><div class="spinner"></div> Loading…</div>';
   const transporters = getMsValues('ms-dt-transporter');
+  const months = getMsValues('ms-dt-month');
   const extra = new URLSearchParams();
   if (transporters.length) extra.set('transporters', transporters.join(','));
+  if (months.length) extra.set('months', months.join(','));
   const res = await apiFetch('/api/tonnage', extra);
   const tonnageData = await res.json();
 
@@ -1223,6 +1275,13 @@ async function loadDailyTonnage() {
     const panel = document.getElementById('ms-dt-transporter-panel');
     tonnageData.transporters.forEach(t => {
       panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${t}" onchange="msItemToggle('ms-dt-transporter',this)"> ${t}</label>`;
+    });
+  }
+  if (!_dailyTonnageMonthInited && tonnageData.all_months && tonnageData.all_months.length) {
+    _dailyTonnageMonthInited = true;
+    const panel = document.getElementById('ms-dt-month-panel');
+    tonnageData.all_months.forEach(m => {
+      panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${m}" onchange="msItemToggle('ms-dt-month',this)" checked> ${m.substring(0,3)}</label>`;
     });
   }
 
@@ -1237,6 +1296,7 @@ async function loadDailyTonnage() {
   const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
   const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
   const tTotalBoxes     = tRows.reduce((s, r) => s + r.boxes, 0);
+  const tTotalShipVal   = tRows.reduce((s, r) => s + (r.shipment_value || 0), 0);
   const _otBadge  = pct => pct == null ? '—'
     : `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(pct)}%</span>`;
   const _modePct  = pct => pct == null ? '<span style="color:var(--text-300);">—</span>'
@@ -1250,6 +1310,7 @@ async function loadDailyTonnage() {
     <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
     <th style="text-align:right;">Boxes</th>
+    <th style="text-align:right;">Shipment Value ($)</th>
     ${hasMode ? '<th style="text-align:right;min-width:70px;">Air %</th><th style="text-align:right;min-width:80px;">Air+Sea %</th><th style="text-align:right;min-width:70px;">Sea %</th>' : ''}
   </tr></thead><tbody>`;
   tRows.forEach(r => {
@@ -1261,6 +1322,7 @@ async function loadDailyTonnage() {
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
       <td style="text-align:right;">${fmtNum(r.boxes)}</td>
+      <td style="text-align:right;">${r.shipment_value > 0 ? '$' + fmtNum(Math.round(r.shipment_value)) : '—'}</td>
       ${hasMode ? `<td style="text-align:right;">${_modePct(r.mode_air_pct)}</td><td style="text-align:right;">${_modePct(r.mode_air_sea_pct)}</td><td style="text-align:right;">${_modePct(r.mode_sea_pct)}</td>` : ''}
     </tr>`;
   });
@@ -1272,6 +1334,7 @@ async function loadDailyTonnage() {
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
     <td style="text-align:right;">${fmtNum(tTotalBoxes)}</td>
+    <td style="text-align:right;">${tTotalShipVal > 0 ? '$' + fmtNum(Math.round(tTotalShipVal)) : '—'}</td>
     ${hasMode ? '<td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td>' : ''}
   </tr></tfoot></table>`;
   document.getElementById('daily-tonnage-table').innerHTML = th;
@@ -1938,13 +2001,16 @@ async function loadChannelHealth() {
 
 // ── View: Tonnage ─────────────────────────────────────────────────────────
 let _tonnageTransporterOptions = [];
+let _tonnageMonthInited = false;
 
 async function loadTonnage() {
   document.getElementById('tonnage-table-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading…</div>';
 
   const transporters = getMsValues('ms-tonnage-transporter');
+  const months = getMsValues('ms-tonnage-month');
   const extra = new URLSearchParams();
   if (transporters.length) extra.set('transporters', transporters.join(','));
+  if (months.length) extra.set('months', months.join(','));
 
   const res = await apiFetch('/api/tonnage', extra);
   const data = await res.json();
@@ -1955,6 +2021,14 @@ async function loadTonnage() {
     const panel = document.getElementById('ms-tonnage-transporter-panel');
     data.transporters.forEach(t => {
       panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${t}" onchange="msItemToggle('ms-tonnage-transporter',this)"> ${t}</label>`;
+    });
+  }
+  // Populate month multi-select on first load
+  if (!_tonnageMonthInited && data.all_months && data.all_months.length) {
+    _tonnageMonthInited = true;
+    const mPanel = document.getElementById('ms-tonnage-month-panel');
+    data.all_months.forEach(m => {
+      mPanel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${m}" onchange="msItemToggle('ms-tonnage-month',this)" checked> ${m.substring(0,3)}</label>`;
     });
   }
 
@@ -1985,15 +2059,17 @@ async function loadTonnage() {
     return;
   }
   const totalShipments = rows.reduce((s, r) => s + r.shipments, 0);
-  const totalVolWt = rows.reduce((s, r) => s + r.vol_wt, 0);
-  const totalUnits = rows.reduce((s, r) => s + r.units, 0);
-  const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
+  const totalVolWt     = rows.reduce((s, r) => s + r.vol_wt, 0);
+  const totalUnits     = rows.reduce((s, r) => s + r.units, 0);
+  const totalBoxes     = rows.reduce((s, r) => s + r.boxes, 0);
+  const totalShipVal   = rows.reduce((s, r) => s + (r.shipment_value || 0), 0);
   let html = `<table class="pivot-table"><thead><tr>
     <th>Month</th>
     <th style="text-align:right;">Shipments</th>
     <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
     <th style="text-align:right;">Boxes</th>
+    <th style="text-align:right;">Shipment Value ($)</th>
   </tr></thead><tbody>`;
   rows.forEach(r => {
     html += `<tr>
@@ -2002,6 +2078,7 @@ async function loadTonnage() {
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
       <td style="text-align:right;">${fmtNum(r.boxes)}</td>
+      <td style="text-align:right;">${r.shipment_value > 0 ? '$' + fmtNum(Math.round(r.shipment_value)) : '—'}</td>
     </tr>`;
   });
   html += `</tbody><tfoot><tr style="font-weight:700;background:var(--bg-card);">
@@ -2010,6 +2087,7 @@ async function loadTonnage() {
     <td style="text-align:right;">${fmtNum(totalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(totalUnits)}</td>
     <td style="text-align:right;">${fmtNum(totalBoxes)}</td>
+    <td style="text-align:right;">${totalShipVal > 0 ? '$' + fmtNum(Math.round(totalShipVal)) : '—'}</td>
   </tr></tfoot></table>`;
   document.getElementById('tonnage-table-wrap').innerHTML = html;
 
@@ -2035,11 +2113,13 @@ async function loadTonnage() {
 }
 
 function clearTonnageFilters() {
-  const el = document.getElementById('ms-tonnage-transporter');
-  el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-  const allCb = el.querySelector('input[value="__all__"]');
-  if (allCb) allCb.checked = true;
-  updateMsLabel('ms-tonnage-transporter');
+  ['ms-tonnage-transporter', 'ms-tonnage-month'].forEach(id => {
+    const el = document.getElementById(id);
+    el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    const allCb = el.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel(id);
+  });
   loadTonnage();
 }
 

@@ -143,7 +143,9 @@ def api_scorecard():
 
 @app.route("/api/monthly-deliveries")
 def api_monthly_deliveries():
-    return jsonify(d.monthly_deliveries(_filtered_df()))
+    transporters_raw = request.args.get("transporters", "All")
+    transporters = [t.strip() for t in transporters_raw.split(",")] if transporters_raw and transporters_raw != "All" else None
+    return jsonify(d.monthly_deliveries(_filtered_df(), transporters=transporters))
 
 
 @app.route("/api/monthly-shipment-value")
@@ -154,8 +156,10 @@ def api_monthly_shipment_value():
 @app.route("/api/tonnage")
 def api_tonnage():
     transporters_raw = request.args.get("transporters", "All")
+    months_raw = request.args.get("months", "All")
     transporters = [t.strip() for t in transporters_raw.split(",")] if transporters_raw and transporters_raw != "All" else None
-    return jsonify(d.tonnage_report(_filtered_df(), transporters=transporters))
+    months = [m.strip() for m in months_raw.split(",")] if months_raw and months_raw != "All" else None
+    return jsonify(d.tonnage_report(_filtered_df(), transporters=transporters, months=months))
 
 
 @app.route("/api/channel-health")
