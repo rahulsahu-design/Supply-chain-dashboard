@@ -19,7 +19,7 @@ SCOPES = [
 STATUS_COL = "Current Status - Ship partner portal"
 DELIVERED_STATUSES = {"Delivered"}
 OVERDUE_BUCKETS = {"21-30", "30+", "31-40", "40+"}
-EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "Abandon"}
+EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "RTS", "Abandon", "Cancelled", "Cancel", "Claims"}
 SCORECARD_EXCLUDE_STATUSES = {"Abandon", "Cancelled", "Cancel", "RTO", "RTS", "Claims"}
 XINDUS = "Xindus Air + Sea"
 PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
@@ -711,9 +711,8 @@ def shipment_ageing(df: pd.DataFrame, channels=None, exp_del_weeks=None,
         bucket_order = [b for b in _all_buckets if b in _present] or _all_buckets[:5]
     else:
         bucket_order = _all_buckets[:5]
-    _EXCLUDE = {"Delivered", "RTO", "Abandon", "RTS"}
     status = df[STATUS_COL].str.strip()
-    d = df[status.notna() & (status != "") & ~status.isin(_EXCLUDE)].copy()
+    d = df[status.notna() & (status != "") & ~status.isin(EXCLUDED_UNDELIVERED_STATUSES)].copy()
     d = _filter_channel(d, channels)
     d = _filter_exp_del_week(d, exp_del_weeks)
     if year and year != "All":
