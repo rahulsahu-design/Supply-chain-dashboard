@@ -318,6 +318,9 @@
       <!-- KPI row -->
       <div class="kpi-grid" id="undel-kpis" style="margin-bottom:20px;"></div>
 
+      <!-- Terminal status counts card -->
+      <div id="terminal-status-card-wrap" style="margin-bottom:20px;"></div>
+
       <!-- Pivot table -->
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid #e2e8f0;">
@@ -1662,14 +1665,16 @@ async function loadUndelivered() {
   if (to)   pivotExtra.set('to', to);
   if (year && year !== 'All') pivotExtra.set('undel_year', year);
 
-  const [res, pivotRes, ageingRes] = await Promise.all([
+  const [res, pivotRes, ageingRes, termRes] = await Promise.all([
     apiFetch('/api/undelivered', extra),
     apiFetch('/api/undelivered-pivot', pivotExtra),
     apiFetch('/api/ageing', pivotExtra),
+    apiFetch('/api/terminal-status-counts', pivotExtra),
   ]);
-  const rows      = await res.json();
-  const pivotData = await pivotRes.json();
+  const rows       = await res.json();
+  const pivotData  = await pivotRes.json();
   const ageingData = await ageingRes.json();
+  const termData   = await termRes.json();
 
   // KPIs
   const byChannel = {};
@@ -1700,6 +1705,9 @@ async function loadUndelivered() {
       <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;">↗ View in Raw Data</div>
     </div>`).join('')}
   `;
+
+  // Terminal status card
+  renderTerminalStatusCard(termData);
 
   // Pivot
   renderPivotTo('undel-pivot-wrap', 'undel-pivot-updated-label', pivotData);
@@ -1738,6 +1746,32 @@ function clearUndeliveredFilters() {
   loadUndelivered();
 }
 
+function renderTerminalStatusCard(data) {
+  const wrap = document.getElementById('terminal-status-card-wrap');
+  if (!wrap) return;
+  if (!data || !data.groups || !data.groups.length) { wrap.innerHTML = ''; return; }
+  const allStatuses = data.groups.flatMap(g => g.statuses);
+  const allFilter = JSON.stringify({ statuses: allStatuses, label: 'All Terminal' });
+  const rows = data.groups.map(g => {
+    const f = JSON.stringify({ statuses: g.statuses, label: g.label });
+    return `<div onclick="event.stopPropagation();navigateToRawData(${f.replace(/"/g,'&quot;')})"
+         style="display:flex;justify-content:space-between;align-items:center;padding:7px 18px;border-top:1px solid #fca5a5;cursor:pointer;transition:background 0.12s;"
+         onmouseover="this.style.background='#fff1f1'" onmouseout="this.style.background=''">
+      <span style="font-size:13px;color:#7f1d1d;font-weight:500;">${g.label}</span>
+      <span style="font-size:13px;font-weight:700;color:#b91c1c;">&#8212;&nbsp;${g.count.toLocaleString()}&nbsp;<span style="font-size:10px;opacity:0.6;">↗</span></span>
+    </div>`;
+  }).join('');
+  wrap.innerHTML = `
+    <div style="display:inline-block;min-width:300px;max-width:420px;border-radius:10px;overflow:hidden;border:1px solid #fca5a5;background:#fff;">
+      <div onclick="navigateToRawData(${allFilter.replace(/"/g,'&quot;')})"
+           style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:#fee2e2;cursor:pointer;transition:background 0.12s;"
+           onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
+        <span style="font-size:11px;font-weight:800;color:#991b1b;text-transform:uppercase;letter-spacing:0.6px;">Terminal Statuses</span>
+        <span style="font-size:11px;color:#b91c1c;font-weight:700;">Total: ${data.total.toLocaleString()}&nbsp;&nbsp;↗ View All</span>
+      </div>
+      ${rows}
+    </div>`;
+}
 
 function renderTATPivotTo(wrapId, labelId, data) {
   const wrap = document.getElementById(wrapId);
@@ -2019,6 +2053,7 @@ function renderRawRows() {
     const STATUS_KEY = 'Current Status - Ship partner portal';
     const DONE = new Set(['Delivered', 'RTO', 'RTS', 'Abandon', 'Cancelled', 'Cancel', 'Claims']);
     if (_rawNavFilter.statusGroup === 'undelivered') rows = rows.filter(r => !DONE.has(r[STATUS_KEY]));
+    if (_rawNavFilter.statuses) { const _sf = new Set(_rawNavFilter.statuses); rows = rows.filter(r => _sf.has(r[STATUS_KEY])); }
     if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
     if (_rawNavFilter.month) {
       const _MLIST = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -2067,6 +2102,7 @@ function navigateToRawData(filter) {
   if (badge) {
     const parts = [];
     if (filter.statusGroup === 'undelivered') parts.push('Undelivered');
+    if (filter.label) parts.push(filter.label);
     if (filter.channel) parts.push(filter.channel);
     badge.textContent = '✕ Filtered: ' + parts.join(' + ');
     badge.style.display = 'inline-block';

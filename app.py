@@ -163,6 +163,11 @@ def api_channel_health():
     return jsonify(d.channel_health(_filtered_df()))
 
 
+@app.route("/api/terminal-status-counts")
+def api_terminal_status_counts():
+    return jsonify(d.terminal_status_counts(_filtered_df()))
+
+
 @app.route("/api/trends")
 def api_trends():
     df = _filtered_df()

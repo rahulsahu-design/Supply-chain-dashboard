@@ -21,6 +21,12 @@ DELIVERED_STATUSES = {"Delivered"}
 OVERDUE_BUCKETS = {"21-30", "30+", "31-40", "40+"}
 EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "RTS", "Abandon", "Cancelled", "Cancel", "Claims"}
 SCORECARD_EXCLUDE_STATUSES = {"Abandon", "Cancelled", "Cancel", "RTO", "RTS", "Claims"}
+TERMINAL_STATUS_GROUPS = [
+    ("Abandon",   {"Abandon"}),
+    ("Cancelled", {"Cancelled", "Cancel"}),
+    ("RTO",       {"RTO"}),
+    ("Claims",    {"Claims"}),
+]
 XINDUS = "Xindus Air + Sea"
 PROM_TAT_BY_TRANSPORTER = {XINDUS: 40, "DHL": 7}
 PROM_TAT_DEFAULT = 12
@@ -963,3 +969,16 @@ def monthly_trend(df: pd.DataFrame) -> list:
     grouped = d.groupby(["month_label", "sort_key"]).size().reset_index(name="deliveries")
     grouped = grouped.sort_values("sort_key")
     return grouped[["month_label", "deliveries"]].to_dict(orient="records")
+
+
+def terminal_status_counts(df: pd.DataFrame) -> dict:
+    if STATUS_COL not in df.columns:
+        return {"groups": [], "total": 0}
+    status_series = df[STATUS_COL].str.strip()
+    result = []
+    total = 0
+    for label, statuses in TERMINAL_STATUS_GROUPS:
+        count = int(status_series.isin(statuses).sum())
+        result.append({"label": label, "statuses": sorted(statuses), "count": count})
+        total += count
+    return {"groups": result, "total": total}
