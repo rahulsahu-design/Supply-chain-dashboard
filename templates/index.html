@@ -454,9 +454,9 @@
         <span id="raw-count" style="font-size:12px;color:var(--text-400);"></span>
         <button class="btn btn-primary" onclick="exportRawData()" style="margin-left:auto;font-size:11px;padding:5px 14px;display:flex;align-items:center;gap:5px;">⬇ Export Excel</button>
       </div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="table-wrap" style="overflow-x:auto;max-height:72vh;">
-          <table id="raw-table">
+      <div class="card" style="padding:0;overflow:hidden;min-width:0;max-width:100%;">
+        <div style="overflow-x:auto;overflow-y:auto;max-height:72vh;">
+          <table id="raw-table" style="min-width:max-content;">
             <thead id="raw-thead"></thead>
             <tbody id="raw-tbody"><tr><td class="loading-state"><div class="spinner"></div> Loading…</td></tr></tbody>
           </table>
@@ -2005,6 +2005,31 @@ function renderRawRows() {
 
 function filterRawTable() { renderRawRows(); }
 
+function applyRawStickyColumns() {
+  const FREEZE = 6;
+  requestAnimationFrame(() => {
+    const ths = document.querySelectorAll('#raw-thead tr th');
+    if (!ths.length) return;
+    const rules = [];
+    let left = 0;
+    for (let i = 0; i < Math.min(FREEZE, ths.length); i++) {
+      const w = ths[i].getBoundingClientRect().width;
+      rules.push(
+        `#raw-table th:nth-child(${i+1}){position:sticky;top:0;left:${left}px;z-index:5;background:var(--cream);}`,
+        `#raw-table td:nth-child(${i+1}){position:sticky;left:${left}px;z-index:2;background:var(--card-bg);}`
+      );
+      left += w;
+    }
+    rules.push(
+      `#raw-table th:nth-child(${FREEZE}){border-right:2px solid var(--border-light);}`,
+      `#raw-table td:nth-child(${FREEZE}){border-right:2px solid var(--border-light);}`
+    );
+    let el = document.getElementById('_raw-sticky-style');
+    if (!el) { el = document.createElement('style'); el.id = '_raw-sticky-style'; document.head.appendChild(el); }
+    el.textContent = rules.join('\n');
+  });
+}
+
 function exportRawData() {
   if (!_currentFilteredRows.length) { alert('No data to export.'); return; }
   const wsData = [
@@ -2073,6 +2098,7 @@ async function loadRawData() {
     const cols = _rawCols.map(c => ({ label: c, key: c, type: RAW_COL_TYPES[c] || 'str' }));
     if (cols.length) buildThead('raw-thead', cols, _rawSort, 'clickRawSort', 'raw');
     renderRawRows();
+    applyRawStickyColumns();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="17" style="text-align:center;padding:20px;color:#e53e3e;font-size:13px;">
       Failed to load: ${err.message}</td></tr>`;

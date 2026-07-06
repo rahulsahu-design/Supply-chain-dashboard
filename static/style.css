@@ -25,7 +25,7 @@
   --accent-orange:#c2610c;
   --accent-red:   #b91c1c;
   --accent-blue:  #1e5f8a;
-  --sidebar-width: 230px;
+  --sidebar-width: 178px;
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-body:    'Inter', system-ui, sans-serif;
   --radius-sm: 8px;
@@ -434,6 +434,15 @@ body {
   border: 1px solid var(--border-light);
   background: var(--card-bg);
   box-shadow: 0 2px 8px rgba(27,67,50,0.04);
+}
+
+/* Raw data table: sticky header row */
+#raw-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--cream);
+  box-shadow: 0 1px 0 var(--border-light);
 }
 
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
