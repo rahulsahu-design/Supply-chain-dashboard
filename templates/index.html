@@ -2012,8 +2012,12 @@ function exportRawData() {
     ..._currentFilteredRows.map(r => _rawCols.map(c => r[c] ?? ''))
   ];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  // Auto-fit column widths
-  ws['!cols'] = _rawCols.map(c => ({ wch: Math.max(c.length, 10) }));
+  // Auto-fit column widths to max content length, capped at 50
+  ws['!cols'] = _rawCols.map(c => {
+    let max = c.length;
+    _currentFilteredRows.forEach(r => { const l = String(r[c] ?? '').length; if (l > max) max = l; });
+    return { wch: Math.min(max + 2, 50) };
+  });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Raw Data 2026');
   XLSX.writeFile(wb, 'raw_data_2026.xlsx');
