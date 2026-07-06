@@ -796,7 +796,6 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
     grouped = df.groupby("Transporter").agg(
         total=("Shipment AWB", "count"),
         delivered=("is_delivered", "sum"),
-        avg_actual_tat=("Actual TAT", "mean"),
         avg_prom_tat=("Prom TAT", "mean"),
     ).reset_index()
 
@@ -810,7 +809,15 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
         avg_delay=("Delay Days", "mean"),
     ).reset_index()
 
+    # Weighted average actual TAT of delivered shipments, weighted by units sent
+    del_tat_df = df[df["is_delivered"] & df["Actual TAT"].notna()].copy()
+    del_tat_df["_w"] = del_tat_df["Qty Sent"].fillna(1).clip(lower=1) if "Qty Sent" in del_tat_df.columns else 1
+    wtd_tat_grp = del_tat_df.groupby("Transporter").apply(
+        lambda g: round(float((g["Actual TAT"] * g["_w"]).sum() / g["_w"].sum()), 2)
+    ).reset_index(name="avg_actual_tat")
+
     grouped = grouped.merge(on_time_grp, on="Transporter", how="left")
+    grouped = grouped.merge(wtd_tat_grp, on="Transporter", how="left")
     grouped["on_time_pct"] = (
         grouped["on_time"] / grouped["tat_count"].replace(0, float("nan")) * 100
     ).round(1)
