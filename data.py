@@ -681,16 +681,10 @@ def _year_mask(df: pd.DataFrame, year_val: int):
 
 
 def raw_data_2026(df: pd.DataFrame) -> dict:
-    RAW_COLS = [
-        "Shipment AWB", "Channel", "Transporter", "Product Name",
-        "Pick up Date", "Expected Delivery Date", "Actual Delivery Date",
-        "Prom TAT", "Actual TAT", "Delay Days",
-        "Ageing", "Ageing Bucket", STATUS_COL, "Qty Sent",
-        "Year", "Month", "Week",
-    ]
+    _INTERNAL = {'is_delivered', 'is_overdue', '_month_eff'}
     d = df[_year_mask(df, 2026)].copy()
-
-    cols = [c for c in RAW_COLS if c in d.columns]
+    # Use the sheet's natural column order; strip computed/internal columns
+    cols = [c for c in d.columns if not c.startswith('_') and c not in _INTERNAL]
     out = d[cols].copy()
     for dc in ["Pick up Date", "Expected Delivery Date", "Actual Delivery Date"]:
         if dc in out.columns:

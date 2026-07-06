@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/static/style.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -450,7 +451,8 @@
         <input type="text" id="raw-search" placeholder="Filter any column…" oninput="filterRawTable()" style="min-width:240px;">
         <button class="gf-clear-btn" onclick="document.getElementById('raw-search').value='';filterRawTable()">✕ Clear</button>
         <span id="raw-nav-filter-badge" style="display:none;background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:3px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;" onclick="clearRawNavFilter()">✕ Clear filter</span>
-        <span id="raw-count" style="margin-left:auto;font-size:12px;color:var(--text-400);"></span>
+        <span id="raw-count" style="font-size:12px;color:var(--text-400);"></span>
+        <button class="btn btn-primary" onclick="exportRawData()" style="margin-left:auto;font-size:11px;padding:5px 14px;display:flex;align-items:center;gap:5px;">⬇ Export Excel</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="table-wrap" style="overflow-x:auto;max-height:72vh;">
@@ -1954,6 +1956,8 @@ function clickRawSort(i) {
   renderRawRows();
 }
 
+let _currentFilteredRows = [];
+
 function renderRawRows() {
   const search = (document.getElementById('raw-search').value || '').toLowerCase();
   const tbody = document.getElementById('raw-tbody');
@@ -1984,6 +1988,7 @@ function renderRawRows() {
     const col = { key: _rawCols[_rawSort.col], type: RAW_COL_TYPES[_rawCols[_rawSort.col]] || 'str' };
     rows = sortRows(rows, col, _rawSort.dir);
   }
+  _currentFilteredRows = rows;
   document.getElementById('raw-count').textContent = `Showing ${rows.length.toLocaleString()} of ${_rawRows.length.toLocaleString()} rows`;
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="${_rawCols.length}" style="text-align:center;padding:20px;color:#718096;">No rows match</td></tr>`;
@@ -1999,6 +2004,20 @@ function renderRawRows() {
 }
 
 function filterRawTable() { renderRawRows(); }
+
+function exportRawData() {
+  if (!_currentFilteredRows.length) { alert('No data to export.'); return; }
+  const wsData = [
+    _rawCols,
+    ..._currentFilteredRows.map(r => _rawCols.map(c => r[c] ?? ''))
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  // Auto-fit column widths
+  ws['!cols'] = _rawCols.map(c => ({ wch: Math.max(c.length, 10) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Raw Data 2026');
+  XLSX.writeFile(wb, 'raw_data_2026.xlsx');
+}
 
 let _rawNavFilter = null;
 
