@@ -210,7 +210,7 @@ def fetch_data(force=False) -> pd.DataFrame:
     return _cache["df"]
 
 
-# Pre-warm the cache as soon as the module loads so the first request is instant
+# Pre-warm the shipment cache as soon as the module loads so the first request is instant
 threading.Thread(target=fetch_data, daemon=True).start()
 
 
@@ -1015,6 +1015,216 @@ def monthly_trend(df: pd.DataFrame) -> list:
     return grouped[["month_label", "deliveries"]].to_dict(orient="records")
 
 
+INV_TAB_NAME = "Inventory Transfer"
+INV_HEADER_ROW_IDX = 5  # row 6 = index 5
+INV_ACTIVE_STATUSES = {"Packing", "In-Transit", "To be Picked Up"}
+
+_inv_cache = {"df": None, "fetched_at": None}
+_inv_ws_cache = {"sheet": None, "last_connect": None}
+_inv_fetch_lock = threading.Lock()
+
+
+def _get_inv_worksheet():
+    now = datetime.now()
+    ws = _inv_ws_cache["sheet"]
+    last = _inv_ws_cache["last_connect"]
+    if ws is None or last is None or (now - last).total_seconds() > WS_CACHE_TTL_SECONDS:
+        client = _connect()
+        ws = client.open_by_key(SHEET_ID).worksheet(INV_TAB_NAME)
+        _inv_ws_cache["sheet"] = ws
+        _inv_ws_cache["last_connect"] = now
+    return ws
+
+
+def _do_fetch_inv():
+    try:
+        ws = _get_inv_worksheet()
+        raw = ws.get_all_values()
+    except Exception:
+        _inv_ws_cache["sheet"] = None
+        ws = _get_inv_worksheet()
+        raw = ws.get_all_values()
+
+    if not raw:
+        return
+
+    headers = [h.strip() for h in raw[INV_HEADER_ROW_IDX]]
+    data_rows = raw[INV_HEADER_ROW_IDX + 1:]
+
+    n = len(headers)
+    data_rows = [row + [''] * (n - len(row)) if len(row) < n else row[:n] for row in data_rows]
+
+    df = pd.DataFrame(data_rows, columns=headers)
+    df = df[df["SKU"].str.strip() != ""].copy()
+
+    for date_col in ["Pickup Date", "ATD"]:
+        if date_col in df.columns:
+            raw_d = df[date_col].astype(str).str.strip()
+            parsed = pd.to_datetime(raw_d, format="%d-%m-%Y", errors="coerce")
+            failed = parsed.isna() & raw_d.ne("") & raw_d.ne("nan")
+            if failed.any():
+                parsed[failed] = pd.to_datetime(raw_d[failed], dayfirst=True, errors="coerce")
+            df[date_col] = parsed
+
+    df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0).astype(int)
+    if "Sum difference" in df.columns:
+        df["Sum difference"] = pd.to_numeric(df["Sum difference"], errors="coerce")
+    if "Inwarded by channel GRN" in df.columns:
+        df["Inwarded by channel GRN"] = pd.to_numeric(df["Inwarded by channel GRN"], errors="coerce")
+
+    _inv_cache["df"] = df
+    _inv_cache["fetched_at"] = datetime.now()
+
+
+def fetch_inv_data(force=False) -> pd.DataFrame:
+    now = datetime.now()
+    is_stale = (
+        _inv_cache["df"] is None
+        or _inv_cache["fetched_at"] is None
+        or (now - _inv_cache["fetched_at"]).total_seconds() >= CACHE_TTL_SECONDS
+    )
+    if not force and _inv_cache["df"] is not None and is_stale:
+        if _inv_fetch_lock.acquire(blocking=False):
+            def _bg():
+                try:
+                    _do_fetch_inv()
+                finally:
+                    _inv_fetch_lock.release()
+            threading.Thread(target=_bg, daemon=True).start()
+        return _inv_cache["df"]
+    if _inv_cache["df"] is None or force:
+        with _inv_fetch_lock:
+            now2 = datetime.now()
+            needs = (
+                force
+                or _inv_cache["df"] is None
+                or _inv_cache["fetched_at"] is None
+                or (now2 - _inv_cache["fetched_at"]).total_seconds() >= CACHE_TTL_SECONDS
+            )
+            if needs:
+                if force:
+                    _inv_ws_cache["sheet"] = None
+                _do_fetch_inv()
+    return _inv_cache["df"]
+
+
+def inventory_transfer_data(force=False) -> dict:
+    MONTHS = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"]
+    df = fetch_inv_data(force=force)
+    if df is None or df.empty:
+        return {"kpis": {}, "by_month": [], "by_3pl": [], "by_carrier": [],
+                "by_channel_flow": [], "pending_rows": [], "sku_summary": []}
+
+    status = df["Status"].str.strip()
+    is_delivered = status == "Delivered"
+    is_active = status.isin(INV_ACTIVE_STATUSES)
+
+    kpis = {
+        "total_shipments": len(df),
+        "total_qty": int(df["Quantity"].sum()),
+        "delivered_count": int(is_delivered.sum()),
+        "delivered_qty": int(df[is_delivered]["Quantity"].sum()),
+        "active_count": int(is_active.sum()),
+        "active_qty": int(df[is_active]["Quantity"].sum()),
+        "packing_count": int((status == "Packing").sum()),
+        "in_transit_count": int((status == "In-Transit").sum()),
+        "to_pickup_count": int((status == "To be Picked Up").sum()),
+        "packing_qty": int(df[status == "Packing"]["Quantity"].sum()),
+        "in_transit_qty": int(df[status == "In-Transit"]["Quantity"].sum()),
+        "to_pickup_qty": int(df[status == "To be Picked Up"]["Quantity"].sum()),
+    }
+
+    by_month = []
+    for m in MONTHS:
+        mdf = df[df["Month"].astype(str).str.strip() == m]
+        if mdf.empty:
+            continue
+        mst = mdf["Status"].str.strip()
+        by_month.append({
+            "month": m[:3],
+            "total_qty": int(mdf["Quantity"].sum()),
+            "delivered_qty": int(mdf[mst == "Delivered"]["Quantity"].sum()),
+            "active_qty": int(mdf[mst.isin(INV_ACTIVE_STATUSES)]["Quantity"].sum()),
+            "total_count": len(mdf),
+            "delivered_count": int((mst == "Delivered").sum()),
+        })
+
+    def _pl_rows(gdf):
+        tot = len(gdf)
+        del_c = int((gdf["Status"].str.strip() == "Delivered").sum())
+        return {
+            "total": tot,
+            "total_qty": int(gdf["Quantity"].sum()),
+            "delivered": del_c,
+            "active": int(gdf["Status"].str.strip().isin(INV_ACTIVE_STATUSES).sum()),
+            "delivery_rate": round(del_c / tot * 100, 1) if tot else 0,
+        }
+
+    by_3pl = []
+    for pl in sorted(df["3PL"].str.strip().replace("", pd.NA).dropna().unique().tolist()):
+        r = {"name": pl}
+        r.update(_pl_rows(df[df["3PL"].str.strip() == pl]))
+        by_3pl.append(r)
+
+    by_carrier = []
+    for carr in sorted(df["Carrier"].str.strip().replace("", pd.NA).dropna().unique().tolist()):
+        if not carr:
+            continue
+        r = {"carrier": carr}
+        r.update(_pl_rows(df[df["Carrier"].str.strip() == carr]))
+        by_carrier.append(r)
+
+    flow_grp = df.groupby(["From Channel", "TO Channel"]).agg(
+        count=("SKU", "count"), qty=("Quantity", "sum")
+    ).reset_index()
+    by_channel_flow = []
+    for _, row in flow_grp.iterrows():
+        by_channel_flow.append({
+            "from": str(row["From Channel"]),
+            "to": str(row["TO Channel"]),
+            "count": int(row["count"]),
+            "qty": int(row["qty"]),
+        })
+
+    pending_rows = []
+    for _, row in df[is_active].iterrows():
+        pickup_str = row["Pickup Date"].strftime("%d/%m/%Y") if pd.notna(row.get("Pickup Date")) else ""
+        pending_rows.append({
+            "month": str(row.get("Month", "")),
+            "pickup_date": pickup_str,
+            "from_channel": str(row.get("From Channel", "")),
+            "to_channel": str(row.get("TO Channel", "")),
+            "from_label": str(row.get("From (Label #)", "")),
+            "to_label": str(row.get("To (Label #)", "")),
+            "sku": str(row.get("SKU", "")),
+            "qty": int(row.get("Quantity", 0)),
+            "3pl": str(row.get("3PL", "")),
+            "carrier": str(row.get("Carrier", "")),
+            "tracking": str(row.get("Tracking & ETD", "")),
+            "status": str(row.get("Status", "")),
+        })
+
+    pend_df = df[is_active]
+    sku_grp = pend_df.groupby("SKU").apply(lambda g: pd.Series({
+        "packing_qty": int(g[g["Status"].str.strip() == "Packing"]["Quantity"].sum()),
+        "in_transit_qty": int(g[g["Status"].str.strip() == "In-Transit"]["Quantity"].sum()),
+        "to_pickup_qty": int(g[g["Status"].str.strip() == "To be Picked Up"]["Quantity"].sum()),
+        "total_pending_qty": int(g["Quantity"].sum()),
+    })).reset_index()
+    sku_summary = sku_grp.sort_values("total_pending_qty", ascending=False).to_dict(orient="records")
+
+    return {
+        "kpis": kpis,
+        "by_month": by_month,
+        "by_3pl": by_3pl,
+        "by_carrier": by_carrier,
+        "by_channel_flow": by_channel_flow,
+        "pending_rows": pending_rows,
+        "sku_summary": sku_summary,
+    }
+
+
 def terminal_status_counts(df: pd.DataFrame, year=None) -> dict:
     if STATUS_COL not in df.columns:
         return {"groups": [], "total": 0}
@@ -1031,3 +1241,7 @@ def terminal_status_counts(df: pd.DataFrame, year=None) -> dict:
         result.append({"label": label, "statuses": sorted(statuses), "count": count})
         total += count
     return {"groups": result, "total": total}
+
+
+# Pre-warm the inventory transfer cache (defined after fetch_inv_data)
+threading.Thread(target=fetch_inv_data, daemon=True).start()

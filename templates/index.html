@@ -48,6 +48,11 @@
   <div class="nav-item" data-view="raw-data">
     <span class="nav-icon">🗃️</span> Raw Data 2026
   </div>
+  <div class="sidebar-section-label">Transfers</div>
+  <div class="nav-item" data-view="inv-transfer">
+    <span class="nav-icon">🔄</span> Inventory Transfer
+  </div>
+
   <div class="sidebar-section-label">Archive</div>
   <div class="nav-item" data-view="summary-2025">
     <span class="nav-icon">📅</span> 2025 Summary
@@ -462,6 +467,97 @@
           </table>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── View: Inventory Transfer ──────────────────────────────────────── -->
+  <div class="view" id="view-inv-transfer">
+    <div class="page-header">
+      <div>
+        <h2>Inventory Transfer</h2>
+        <div class="subtitle">Channel-to-channel inventory movements — 3PL & carrier tracking</div>
+      </div>
+    </div>
+    <div class="content-area">
+
+      <!-- KPI row -->
+      <div class="kpi-grid" id="inv-kpis" style="margin-bottom:24px;">
+        <div class="loading-state"><div class="spinner"></div> Loading…</div>
+      </div>
+
+      <!-- Charts row -->
+      <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:20px;margin-bottom:24px;">
+
+        <!-- Status donut -->
+        <div class="card" style="padding:16px 20px;">
+          <div style="font-size:10px;font-weight:700;color:var(--text-400);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:14px;">Transfer Status Breakdown</div>
+          <div style="position:relative;height:220px;">
+            <canvas id="inv-status-donut"></canvas>
+          </div>
+          <div id="inv-donut-legend" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;font-size:11px;"></div>
+        </div>
+
+        <!-- Monthly volume bar -->
+        <div class="card" style="padding:16px 20px;">
+          <div style="font-size:10px;font-weight:700;color:var(--text-400);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:14px;">Monthly Transfer Volume (Units)</div>
+          <div style="position:relative;height:240px;">
+            <canvas id="inv-monthly-bar"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel Flow -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#e0f2fe;">
+          <span style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #0ea5e9;padding-left:10px;">🔀 Channel Flow Summary</span>
+        </div>
+        <div id="inv-channel-flow" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- 3PL & Carrier side-by-side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#f0fdf4;">
+            <span style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #10b981;padding-left:10px;">🏭 3PL Performance</span>
+          </div>
+          <div id="inv-3pl-table" style="overflow-x:auto;">
+            <div class="loading-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fefce8;">
+            <span style="font-size:10px;font-weight:700;color:#713f12;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #eab308;padding-left:10px;">🚛 Carrier Performance</span>
+          </div>
+          <div id="inv-carrier-table" style="overflow-x:auto;">
+            <div class="loading-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending / Active Transfers table -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#fff7ed;">
+          <span style="font-size:10px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #f97316;padding-left:10px;">⏳ Active / Pending Transfers</span>
+        </div>
+        <div id="inv-pending-table" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- SKU Pending Summary -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:24px;">
+        <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);background:#f5f3ff;">
+          <span style="font-size:10px;font-weight:700;color:#4c1d95;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-display);border-left:4px solid #8b5cf6;padding-left:10px;">📦 Pending Units by SKU</span>
+        </div>
+        <div id="inv-sku-summary" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1059,6 +1155,7 @@ function loadView(view, force) {
     case 'daily-summary':  return loadSummary();
     case 'delivered':      return loadDelivered();
     case 'undelivered':    return loadUndelivered();
+    case 'inv-transfer':   return loadInvTransfer();
     case 'scorecard':      return loadScorecard();
     case 'channel-health': return loadChannelHealth();
     case 'raw-data':       return loadRawData();
@@ -2524,6 +2621,216 @@ async function loadSummary2025() {
   renderTATPivotTo('summary-2025-tat-pivot', null, tat);
   renderPivotTo('summary-2025-undel-pivot', null, undelPivot);
   renderAgeingTable('summary-2025-ageing', ageing);
+}
+
+// ── Inventory Transfer ────────────────────────────────────────────────────
+
+let _invDonut = null, _invBar = null;
+
+async function loadInvTransfer() {
+  document.getElementById('inv-kpis').innerHTML = skelKpis(5);
+  ['inv-channel-flow','inv-3pl-table','inv-carrier-table','inv-pending-table','inv-sku-summary']
+    .forEach(id => { document.getElementById(id).innerHTML = '<div class="loading-state"><div class="spinner"></div></div>'; });
+
+  const data = await apiFetch('/api/inventory-transfer');
+  const k = data.kpis;
+
+  // ── KPI Cards ──
+  const delRate = k.total_shipments ? (k.delivered_count / k.total_shipments * 100).toFixed(1) : null;
+  const activeRate = k.total_shipments ? (k.active_count / k.total_shipments * 100).toFixed(1) : null;
+
+  function _drB(rate) {
+    if (rate === null) return '';
+    const r = parseFloat(rate);
+    const col = r >= 80 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
+    return `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:${col}20;color:${col};">${rate}%</span>`;
+  }
+
+  document.getElementById('inv-kpis').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Total Transfers</div>
+      <div class="kpi-value">${fmtNum(k.total_shipments)}</div>
+      <div class="kpi-sub">${fmtNum(k.total_qty)} units total</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-label">Delivered</div>
+      <div class="kpi-value">${fmtNum(k.delivered_count)}</div>
+      <div class="kpi-sub">${fmtNum(k.delivered_qty)} units ${_drB(delRate)}</div>
+    </div>
+    <div class="kpi-card" style="border-left-color:#f97316;">
+      <div class="kpi-label">In-Transit</div>
+      <div class="kpi-value" style="color:#f97316;">${fmtNum(k.in_transit_count)}</div>
+      <div class="kpi-sub">${fmtNum(k.in_transit_qty)} units</div>
+    </div>
+    <div class="kpi-card" style="border-left-color:#eab308;">
+      <div class="kpi-label">Packing</div>
+      <div class="kpi-value" style="color:#ca8a04;">${fmtNum(k.packing_count)}</div>
+      <div class="kpi-sub">${fmtNum(k.packing_qty)} units</div>
+    </div>
+    <div class="kpi-card" style="border-left-color:#8b5cf6;">
+      <div class="kpi-label">To be Picked Up</div>
+      <div class="kpi-value" style="color:#7c3aed;">${fmtNum(k.to_pickup_count)}</div>
+      <div class="kpi-sub">${fmtNum(k.to_pickup_qty)} units</div>
+    </div>
+  `;
+
+  // ── Status Donut ──
+  const donutLabels = ['Delivered', 'In-Transit', 'Packing', 'To be Picked Up'];
+  const donutData = [k.delivered_count, k.in_transit_count, k.packing_count, k.to_pickup_count];
+  const donutColors = ['#10b981', '#f97316', '#eab308', '#8b5cf6'];
+  if (_invDonut) { _invDonut.destroy(); _invDonut = null; }
+  const dCtx = document.getElementById('inv-status-donut').getContext('2d');
+  _invDonut = new Chart(dCtx, {
+    type: 'doughnut',
+    data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      cutout: '68%', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        label: ctx => ` ${ctx.label}: ${ctx.parsed} transfers`
+      }}}
+    }
+  });
+  document.getElementById('inv-donut-legend').innerHTML = donutLabels.map((l, i) =>
+    donutData[i] > 0 ? `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:${donutColors[i]};flex-shrink:0;"></span>${l}: <b>${donutData[i]}</b></span>` : ''
+  ).filter(Boolean).join('');
+
+  // ── Monthly Bar ──
+  const months = data.by_month.map(r => r.month);
+  const delQty = data.by_month.map(r => r.delivered_qty);
+  const actQty = data.by_month.map(r => r.active_qty);
+  if (_invBar) { _invBar.destroy(); _invBar = null; }
+  const bCtx = document.getElementById('inv-monthly-bar').getContext('2d');
+  _invBar = new Chart(bCtx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        { label: 'Delivered', data: delQty, backgroundColor: '#10b981cc', borderRadius: 3 },
+        { label: 'Active', data: actQty, backgroundColor: '#f97316cc', borderRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { stacked: true, grid: { color: '#f0f0f0' }, ticks: { font: { size: 11 } } },
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)} units` } }
+      }
+    }
+  });
+
+  // ── Channel Flow ──
+  const flows = data.by_channel_flow;
+  const flowHtml = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr>
+      <th style="padding:8px 16px;text-align:left;font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);">From Channel</th>
+      <th style="padding:8px 16px;text-align:left;font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);">→ To Channel</th>
+      <th style="padding:8px 16px;text-align:right;font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);">Shipments</th>
+      <th style="padding:8px 16px;text-align:right;font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);">Total Units</th>
+    </tr></thead>
+    <tbody>
+      ${flows.map((r, i) => `<tr style="background:${i%2===0?'transparent':'var(--row-alt)'};">
+        <td style="padding:8px 16px;font-size:12px;font-weight:600;">${r.from}</td>
+        <td style="padding:8px 16px;font-size:12px;color:#0ea5e9;font-weight:600;">${r.to}</td>
+        <td style="padding:8px 16px;font-size:12px;text-align:right;">${fmtNum(r.count)}</td>
+        <td style="padding:8px 16px;font-size:12px;text-align:right;font-weight:600;">${fmtNum(r.qty)}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+  document.getElementById('inv-channel-flow').innerHTML = flowHtml;
+
+  // ── 3PL Table helper ──
+  function _perfTable(rows, nameKey) {
+    const th = (t, align='left') => `<th style="padding:8px 12px;text-align:${align};font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);">${t}</th>`;
+    const td = (t, align='left', extra='') => `<td style="padding:7px 12px;font-size:12px;text-align:${align};${extra}">${t}</td>`;
+    function drBadge(r) {
+      const col = r >= 80 ? '#10b981' : r >= 60 ? '#f59e0b' : '#ef4444';
+      return `<span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:${col}20;color:${col};">${r}%</span>`;
+    }
+    return `<table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        ${th('Name')}${th('Transfers','right')}${th('Units','right')}${th('Delivered','right')}${th('Active','right')}${th('Delivery Rate','center')}
+      </tr></thead>
+      <tbody>
+        ${rows.map((r, i) => `<tr style="background:${i%2===0?'transparent':'var(--row-alt)'};">
+          ${td(`<b>${r[nameKey]}</b>`)}
+          ${td(fmtNum(r.total),'right')}
+          ${td(fmtNum(r.total_qty),'right')}
+          ${td(fmtNum(r.delivered),'right','color:#10b981;font-weight:600;')}
+          ${td(r.active > 0 ? fmtNum(r.active) : '—','right','color:#f97316;')}
+          ${td(drBadge(r.delivery_rate),'center')}
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+  document.getElementById('inv-3pl-table').innerHTML = _perfTable(data.by_3pl, 'name');
+  document.getElementById('inv-carrier-table').innerHTML = _perfTable(data.by_carrier, 'carrier');
+
+  // ── Pending Transfers ──
+  const STATUS_COLORS = { 'In-Transit': '#f97316', 'Packing': '#ca8a04', 'To be Picked Up': '#7c3aed' };
+  function statusBadge(s) {
+    const col = STATUS_COLORS[s] || '#6b7280';
+    return `<span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${col}18;color:${col};">${s}</span>`;
+  }
+
+  const pending = data.pending_rows;
+  if (!pending.length) {
+    document.getElementById('inv-pending-table').innerHTML = '<div class="empty-state" style="padding:24px;">No active transfers</div>';
+  } else {
+    const thP = (t, align='left') => `<th style="padding:8px 12px;text-align:${align};font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);white-space:nowrap;">${t}</th>`;
+    const tdP = (t, align='left', extra='') => `<td style="padding:7px 12px;font-size:12px;text-align:${align};${extra}">${t}</td>`;
+    document.getElementById('inv-pending-table').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          ${thP('Month')}${thP('Pickup Date')}${thP('From')}${thP('To')}${thP('SKU')}${thP('Qty','right')}${thP('3PL')}${thP('Carrier')}${thP('Tracking')}${thP('Status','center')}
+        </tr></thead>
+        <tbody>
+          ${pending.map((r, i) => `<tr style="background:${i%2===0?'transparent':'var(--row-alt)'};">
+            ${tdP(r.month)}
+            ${tdP(r.pickup_date,'left','white-space:nowrap;')}
+            ${tdP(`<b>${r.from_channel}</b>`)}
+            ${tdP(`<span style="color:#0ea5e9;font-weight:600;">${r.to_channel}</span>`)}
+            ${tdP(`<span style="font-size:11px;">${r.sku}</span>`)}
+            ${tdP(fmtNum(r.qty),'right','font-weight:600;')}
+            ${tdP(r['3pl'],'left','font-size:11px;color:var(--text-400);')}
+            ${tdP(r.carrier,'left','font-size:11px;')}
+            ${tdP(r.tracking ? `<span style="font-family:monospace;font-size:11px;">${r.tracking}</span>` : '—')}
+            ${tdP(statusBadge(r.status),'center')}
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── SKU Pending Summary ──
+  const skus = data.sku_summary;
+  if (!skus.length) {
+    document.getElementById('inv-sku-summary').innerHTML = '<div class="empty-state" style="padding:24px;">No pending units</div>';
+  } else {
+    const thS = (t, align='left') => `<th style="padding:8px 14px;text-align:${align};font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);">${t}</th>`;
+    const tdS = (t, align='left', extra='') => `<td style="padding:8px 14px;font-size:12px;text-align:${align};${extra}">${t}</td>`;
+    document.getElementById('inv-sku-summary').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          ${thS('SKU')}
+          ${thS('<span style="color:#ca8a04;">Packing</span>','right')}
+          ${thS('<span style="color:#f97316;">In-Transit</span>','right')}
+          ${thS('<span style="color:#7c3aed;">To be Picked Up</span>','right')}
+          ${thS('Total Pending','right')}
+        </tr></thead>
+        <tbody>
+          ${skus.map((r, i) => `<tr style="background:${i%2===0?'transparent':'var(--row-alt)'};">
+            ${tdS(`<b>${r.SKU}</b>`)}
+            ${tdS(r.packing_qty > 0 ? fmtNum(r.packing_qty) : '—', 'right', 'color:#ca8a04;')}
+            ${tdS(r.in_transit_qty > 0 ? fmtNum(r.in_transit_qty) : '—', 'right', 'color:#f97316;')}
+            ${tdS(r.to_pickup_qty > 0 ? fmtNum(r.to_pickup_qty) : '—', 'right', 'color:#7c3aed;')}
+            ${tdS(`<b>${fmtNum(r.total_pending_qty)}</b>`, 'right')}
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────

@@ -167,6 +167,12 @@ def api_channel_health():
     return jsonify(d.channel_health(_filtered_df()))
 
 
+@app.route("/api/inventory-transfer")
+def api_inventory_transfer():
+    force = request.args.get("refresh") == "1"
+    return jsonify(d.inventory_transfer_data(force=force))
+
+
 @app.route("/api/terminal-status-counts")
 def api_terminal_status_counts():
     year = request.args.get("year", "2026")
