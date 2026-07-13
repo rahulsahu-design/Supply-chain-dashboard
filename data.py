@@ -1016,7 +1016,7 @@ def monthly_trend(df: pd.DataFrame) -> list:
 
 
 INV_TAB_NAME = "Inventory Transfer"
-INV_HEADER_ROW_IDX = 5  # row 6 = index 5
+INV_HEADER_ROW_IDX = 2  # row 3 = index 2
 INV_ACTIVE_STATUSES = {"Packing", "In-Transit", "To be Picked Up"}
 
 _inv_cache = {"df": None, "fetched_at": None}
