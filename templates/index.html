@@ -2632,7 +2632,7 @@ async function loadInvTransfer() {
   ['inv-channel-flow','inv-3pl-table','inv-carrier-table','inv-pending-table','inv-sku-summary']
     .forEach(id => { document.getElementById(id).innerHTML = '<div class="loading-state"><div class="spinner"></div></div>'; });
 
-  const data = await apiFetch('/api/inventory-transfer');
+  const data = await (await apiFetch('/api/inventory-transfer')).json();
   const k = data.kpis;
 
   // ── KPI Cards ──
