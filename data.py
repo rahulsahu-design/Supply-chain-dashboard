@@ -1243,5 +1243,186 @@ def terminal_status_counts(df: pd.DataFrame, year=None) -> dict:
     return {"groups": result, "total": total}
 
 
+XINDUS_TRANSPORTERS = {"Xindus Air + Sea", "Xindus Sea", "Xindus Air"}
+XINDUS_MODES = {"Air + Sea", "Sea", "Air"}
+AGEING_BUCKET_ORDER = ["0-5", "6-10", "11-20", "21-30", "30+", "31-40", "40+"]
+
+
+def xindus_tracker(df: pd.DataFrame) -> dict:
+    xdf = df[df["Transporter"].str.strip().isin(XINDUS_TRANSPORTERS)].copy()
+    if xdf.empty:
+        return {"kpis": {}, "modes": {}, "in_transit_shipments": [],
+                "ageing_dist": [], "sku_summary": [], "delivered_summary": []}
+
+    cw_col = _chargeable_col(xdf)
+
+    def _safe_sum(sub, col):
+        return round(float(sub[col].fillna(0).sum()), 1) if col and col in sub.columns else 0
+
+    def _safe_mean(sub, col):
+        vals = sub[col].dropna() if col and col in sub.columns else pd.Series([], dtype=float)
+        return round(float(vals.mean()), 1) if len(vals) > 0 else None
+
+    it_mask = ~xdf["is_delivered"]
+
+    # ── Overall KPIs ──
+    kpis = {
+        "total_rows": len(xdf),
+        "total_qty": int(xdf["Qty Sent"].fillna(0).sum()),
+        "total_cw": _safe_sum(xdf, cw_col),
+        "total_value": _safe_sum(xdf, "Shipment Value"),
+        "delivered_count": int(xdf["is_delivered"].sum()),
+        "in_transit_count": int(it_mask.sum()),
+        "in_transit_qty": int(xdf[it_mask]["Qty Sent"].fillna(0).sum()),
+        "in_transit_cw": _safe_sum(xdf[it_mask], cw_col),
+        "in_transit_value": _safe_sum(xdf[it_mask], "Shipment Value"),
+        "delivery_rate": round(float(xdf["is_delivered"].sum()) / len(xdf) * 100, 1),
+    }
+
+    # ── Per-mode breakdown ──
+    modes = {}
+    for mode_label, transporters in [
+        ("Air + Sea", {"Xindus Air + Sea"}),
+        ("Sea",       {"Xindus Sea"}),
+        ("Air",       {"Xindus Air"}),
+    ]:
+        mdf = xdf[xdf["Transporter"].str.strip().isin(transporters)]
+        if mdf.empty:
+            continue
+        m_it = mdf[~mdf["is_delivered"]]
+        del_df = mdf[mdf["is_delivered"]]
+
+        # Ageing bucket distribution for in-transit
+        ageing_buckets = {}
+        if "Ageing Bucket" in mdf.columns:
+            for b in AGEING_BUCKET_ORDER:
+                bdf = m_it[m_it["Ageing Bucket"].str.strip() == b]
+                if len(bdf):
+                    ageing_buckets[b] = {
+                        "count": len(bdf),
+                        "qty": int(bdf["Qty Sent"].fillna(0).sum()),
+                    }
+
+        # Intransit bucket (Within TAT / Outside TAT)
+        intransit_within = 0
+        intransit_outside = 0
+        if "Intransit Bucket" in m_it.columns:
+            intransit_within = int((m_it["Intransit Bucket"].str.strip() == "Within TAT").sum())
+            intransit_outside = int((m_it["Intransit Bucket"].str.strip() == "Outside TAT").sum())
+
+        modes[mode_label] = {
+            "total": len(mdf),
+            "delivered": int(mdf["is_delivered"].sum()),
+            "in_transit": int((~mdf["is_delivered"]).sum()),
+            "total_qty": int(mdf["Qty Sent"].fillna(0).sum()),
+            "in_transit_qty": int(m_it["Qty Sent"].fillna(0).sum()),
+            "delivered_qty": int(del_df["Qty Sent"].fillna(0).sum()),
+            "total_cw": _safe_sum(mdf, cw_col),
+            "in_transit_cw": _safe_sum(m_it, cw_col),
+            "total_value": _safe_sum(mdf, "Shipment Value"),
+            "in_transit_value": _safe_sum(m_it, "Shipment Value"),
+            "delivery_rate": round(float(mdf["is_delivered"].sum()) / len(mdf) * 100, 1) if len(mdf) else 0,
+            "avg_actual_tat": _safe_mean(del_df[del_df["Actual TAT"].notna()], "Actual TAT"),
+            "avg_prom_tat": _safe_mean(mdf, "Prom TAT"),
+            "avg_delay": _safe_mean(del_df[del_df["Delay Days"].notna()], "Delay Days"),
+            "on_time_pct": round(float((del_df["Delay Days"].fillna(999) <= 0).sum()) / len(del_df) * 100, 1) if len(del_df) else None,
+            "intransit_within_tat": intransit_within,
+            "intransit_outside_tat": intransit_outside,
+            "ageing_buckets": ageing_buckets,
+        }
+
+    # ── In-transit shipments grouped by AWB ──
+    it_df = xdf[it_mask].copy()
+    it_df["_awb_clean"] = it_df["Shipment AWB"].astype(str).str.strip()
+
+    in_transit_shipments = []
+    for awb_raw, grp in it_df.groupby("_awb_clean", sort=False):
+        # Split AWB: first line = air waybill, second line = container number
+        parts = [p.strip() for p in awb_raw.split("\n") if p.strip()]
+        awb = parts[0] if parts else awb_raw
+        container = parts[1] if len(parts) > 1 else ""
+
+        pickup = grp["Pick up Date"].dropna().min()
+        exp_del = grp["Expected Delivery Date"].dropna().min()
+        ageing = grp["Ageing"].dropna().max()
+        ageing_bucket = grp["Ageing Bucket"].dropna().iloc[0] if "Ageing Bucket" in grp.columns and not grp["Ageing Bucket"].dropna().empty else ""
+        intransit_b = grp["Intransit Bucket"].dropna().iloc[0] if "Intransit Bucket" in grp.columns and not grp["Intransit Bucket"].dropna().empty else ""
+        mode = grp["Mode"].dropna().iloc[0] if "Mode" in grp.columns and not grp["Mode"].dropna().empty else ""
+        channels = sorted(grp["Channel"].dropna().str.strip().unique().tolist()) if "Channel" in grp.columns else []
+        skus = grp["Product Name"].dropna().str.strip().unique().tolist()
+        destinations = sorted(grp["Destination"].dropna().str.strip().replace("", pd.NA).dropna().unique().tolist()) if "Destination" in grp.columns else []
+
+        in_transit_shipments.append({
+            "awb": awb,
+            "container": container,
+            "mode": mode,
+            "pickup_date": pickup.strftime("%d/%m/%Y") if pd.notna(pickup) else "",
+            "exp_delivery": exp_del.strftime("%d/%m/%Y") if pd.notna(exp_del) else "",
+            "ageing": int(ageing) if pd.notna(ageing) else None,
+            "ageing_bucket": ageing_bucket,
+            "intransit_bucket": intransit_b,
+            "total_qty": int(grp["Qty Sent"].fillna(0).sum()),
+            "total_cw": _safe_sum(grp, cw_col),
+            "channels": channels,
+            "sku_count": len(skus),
+            "skus": skus,
+            "destination_count": len(destinations),
+        })
+
+    # Sort by ageing descending (most overdue first)
+    in_transit_shipments.sort(key=lambda r: r["ageing"] or 0, reverse=True)
+
+    # ── Ageing distribution for chart (in-transit only) ──
+    ageing_dist = []
+    for b in AGEING_BUCKET_ORDER:
+        row = {"bucket": b}
+        for mode_label, transporters in [("Air + Sea", {"Xindus Air + Sea"}), ("Sea", {"Xindus Sea"})]:
+            mdf_it = xdf[it_mask & xdf["Transporter"].str.strip().isin(transporters)]
+            bdf = mdf_it[mdf_it["Ageing Bucket"].str.strip() == b] if "Ageing Bucket" in mdf_it.columns else mdf_it.iloc[0:0]
+            row[mode_label] = {"count": len(bdf), "qty": int(bdf["Qty Sent"].fillna(0).sum())}
+        if row["Air + Sea"]["count"] + row.get("Sea", {}).get("count", 0) > 0:
+            ageing_dist.append(row)
+
+    # ── SKU summary (in-transit) ──
+    sku_rows = []
+    for sku, sdf in it_df.groupby("Product Name"):
+        r = {"sku": str(sku)}
+        for mode_label, transporters in [("Air + Sea", {"Xindus Air + Sea"}), ("Sea", {"Xindus Sea"})]:
+            mdf = sdf[sdf["Transporter"].str.strip().isin(transporters)]
+            r[mode_label] = int(mdf["Qty Sent"].fillna(0).sum())
+        r["total"] = int(sdf["Qty Sent"].fillna(0).sum())
+        sku_rows.append(r)
+    sku_rows.sort(key=lambda r: r["total"], reverse=True)
+
+    # ── Delivered summary (by mode + channel) ──
+    del_df_all = xdf[xdf["is_delivered"]].copy()
+    delivered_summary = []
+    if not del_df_all.empty:
+        grp = del_df_all.groupby(["Mode", "Channel"]).agg(
+            count=("Shipment AWB", "count"),
+            qty=("Qty Sent", "sum"),
+            avg_tat=("Actual TAT", "mean"),
+            avg_delay=("Delay Days", "mean"),
+        ).reset_index().round(1)
+        for _, row in grp.iterrows():
+            delivered_summary.append({
+                "mode": str(row["Mode"]),
+                "channel": str(row["Channel"]),
+                "count": int(row["count"]),
+                "qty": int(row["qty"]),
+                "avg_tat": row["avg_tat"] if pd.notna(row["avg_tat"]) else None,
+                "avg_delay": row["avg_delay"] if pd.notna(row["avg_delay"]) else None,
+            })
+
+    return {
+        "kpis": kpis,
+        "modes": modes,
+        "in_transit_shipments": in_transit_shipments,
+        "ageing_dist": ageing_dist,
+        "sku_summary": sku_rows,
+        "delivered_summary": delivered_summary,
+    }
+
+
 # Pre-warm the inventory transfer cache (defined after fetch_inv_data)
 threading.Thread(target=fetch_inv_data, daemon=True).start()

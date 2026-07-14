@@ -167,6 +167,11 @@ def api_channel_health():
     return jsonify(d.channel_health(_filtered_df()))
 
 
+@app.route("/api/xindus")
+def api_xindus():
+    return jsonify(d.xindus_tracker(_df()))
+
+
 @app.route("/api/inventory-transfer")
 def api_inventory_transfer():
     force = request.args.get("refresh") == "1"
