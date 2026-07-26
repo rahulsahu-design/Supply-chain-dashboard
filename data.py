@@ -516,8 +516,8 @@ def undelivered_shipments(df: pd.DataFrame, channel=None, exp_del_week=None,
     if statuses and STATUS_COL in d.columns:
         d = d[d[STATUS_COL].str.strip().isin(statuses)]
     cols = [
-        "Shipment AWB", "Channel", "Transporter", "Pick up Date",
-        "Expected Delivery Date", "Ageing", "Ageing Bucket",
+        "Shipment AWB", "Order ID", "Invoice No", "Channel", "Transporter",
+        "Pick up Date", "Expected Delivery Date", "Ageing", "Ageing Bucket",
         "Delay Days", STATUS_COL, "Product Name", "Qty Sent", "is_overdue",
     ]
     cols = [c for c in cols if c in d.columns]

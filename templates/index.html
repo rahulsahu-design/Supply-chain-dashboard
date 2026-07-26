@@ -1694,7 +1694,8 @@ function clearDeliveredFilters() {
   loadDelivered();
 }
 
-function renderPivotTo(wrapId, updatedLabelId, data) {
+function renderPivotTo(wrapId, updatedLabelId, data, opts) {
+  opts = opts || {};
   const wrap = document.getElementById(wrapId);
   const { dates, rows, grand_totals, overall_total } = data;
 
@@ -1725,11 +1726,21 @@ function renderPivotTo(wrapId, updatedLabelId, data) {
     html += `<td class="pivot-col-total"><strong>${chRow.channel_total.toLocaleString()}</strong></td></tr>`;
 
     chRow.products.forEach(prod => {
+      const prodEsc = prod.product.replace(/'/g, "\\'");
       html += `<tr class="pivot-prod-row" data-chid="${chId}">`;
-      html += `<td style="padding-left:24px;">${prod.product}</td>`;
+      if (opts.interactive) {
+        html += `<td style="padding-left:24px;"><span class="pivot-prod-link" onclick="navigateToRawData({statusGroup:'undelivered',product:'${prodEsc}'})" title="View all undelivered in Raw Data">${prod.product}</span></td>`;
+      } else {
+        html += `<td style="padding-left:24px;">${prod.product}</td>`;
+      }
       dates.forEach(d => {
         const v = prod.values[d];
-        html += `<td>${v != null ? v.toLocaleString() : ''}</td>`;
+        if (opts.interactive && v != null) {
+          const ch = chRow.channel.replace(/'/g, "\\'");
+          html += `<td><span class="pivot-cell-link" onclick="showPivotCellDetail('${ch}','${prodEsc}','${d}',event)">${v.toLocaleString()}</span></td>`;
+        } else {
+          html += `<td>${v != null ? v.toLocaleString() : ''}</td>`;
+        }
       });
       html += `<td class="pivot-col-total">${prod.total.toLocaleString()}</td></tr>`;
     });
@@ -1878,8 +1889,8 @@ async function loadUndelivered() {
   // Terminal status card
   renderTerminalStatusCard(termData);
 
-  // Pivot
-  renderPivotTo('undel-pivot-wrap', 'undel-pivot-updated-label', pivotData);
+  // Pivot — interactive: cell numbers open detail popup, product names navigate to raw data
+  renderPivotTo('undel-pivot-wrap', 'undel-pivot-updated-label', pivotData, { interactive: true });
 
   // Detail table — default sort by Ageing desc
   if (_undelSort.col < 0) { _undelSort.col = 5; _undelSort.dir = -1; }
@@ -2129,6 +2140,7 @@ function renderRawRows() {
     if (_rawNavFilter.statusGroup === 'mom-undelivered') { const _excl = new Set(['Delivered', 'RTS', 'Cancelled', 'Cancel']); rows = rows.filter(r => !_excl.has((r[STATUS_KEY]||'').trim())); }
     if (_rawNavFilter.statuses) { const _sf = new Set(_rawNavFilter.statuses); rows = rows.filter(r => _sf.has((r[STATUS_KEY] || '').trim())); }
     if (_rawNavFilter.channel) rows = rows.filter(r => r['Channel'] === _rawNavFilter.channel);
+    if (_rawNavFilter.product) rows = rows.filter(r => r['Product Name'] === _rawNavFilter.product);
     if (_rawNavFilter.month) {
       const _MLIST = ["January","February","March","April","May","June","July","August","September","October","November","December"];
       const _mIdx = _MLIST.indexOf(_rawNavFilter.month) + 1; // 1-based
@@ -2222,6 +2234,7 @@ function navigateToRawData(filter) {
     if (filter.statusGroup === 'undelivered' || filter.statusGroup === 'mom-undelivered') parts.push('Undelivered');
     if (filter.label) parts.push(filter.label);
     if (filter.channel) parts.push(filter.channel);
+    if (filter.product) parts.push(filter.product);
     badge.textContent = '✕ Filtered: ' + parts.join(' + ');
     badge.style.display = 'inline-block';
   }
@@ -2230,6 +2243,68 @@ function navigateToRawData(filter) {
   } else {
     loadRawData();
   }
+}
+
+// ── Pivot cell detail popup ───────────────────────────────────────────────
+
+function _pivotDateMatch(rowDateStr, pivotLabel) {
+  if (!rowDateStr) return false;
+  const parts = rowDateStr.split('/');
+  if (parts.length < 3) return false;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const label = `${parseInt(parts[0])} ${months[parseInt(parts[1])-1]} ${parts[2]}`;
+  return label === pivotLabel;
+}
+
+function showPivotCellDetail(channel, product, dateLabel, event) {
+  event.stopPropagation();
+  const matching = _undelRows.filter(r =>
+    r['Channel'] === channel &&
+    r['Product Name'] === product &&
+    _pivotDateMatch(r['Expected Delivery Date'], dateLabel)
+  );
+
+  const popup = document.getElementById('pivot-popup');
+  document.getElementById('pivot-popup-title').textContent =
+    `${channel} · ${product} · Exp. Delivery: ${dateLabel} — ${matching.length} shipment${matching.length !== 1 ? 's' : ''}`;
+
+  if (!matching.length) {
+    document.getElementById('pivot-popup-body').innerHTML =
+      '<div style="padding:24px;text-align:center;color:var(--text-400);">No matching rows found</div>';
+  } else {
+    const th = t => `<th style="padding:8px 12px;font-size:11px;color:var(--text-400);font-weight:600;border-bottom:1px solid var(--border-light);white-space:nowrap;text-align:left;">${t}</th>`;
+    const td = (t, extra) => `<td style="padding:7px 12px;font-size:12px;${extra||''}">${t||'—'}</td>`;
+    document.getElementById('pivot-popup-body').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          ${th('AWB')}${th('Order ID')}${th('Invoice No')}${th('Units')}${th('Exp. Delivery')}${th('Ageing')}${th('Status')}
+        </tr></thead>
+        <tbody>
+          ${matching.map((r, i) => `<tr style="background:${i%2===0?'transparent':'var(--row-alt)'};">
+            ${td(`<span style="font-family:monospace;font-size:11px;">${r['Shipment AWB']}</span>`)}
+            ${td(r['Order ID'])}
+            ${td(r['Invoice No'])}
+            ${td(`<b>${fmtNum(r['Qty Sent'])}</b>`, 'text-align:right;')}
+            ${td(r['Expected Delivery Date'])}
+            ${td(r['Ageing'] !== '' && r['Ageing'] != null ? `<b style="color:${Number(r['Ageing'])>30?'#ef4444':Number(r['Ageing'])>20?'#f59e0b':'#10b981'};">${r['Ageing']}d</b>` : '—')}
+            ${td(r['Current Status - Ship partner portal'] ? `<span class="badge ${r['is_overdue']?'badge-red':''}" style="font-size:10px;">${r['Current Status - Ship partner portal']}</span>` : '—')}
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="border-top:2px solid var(--border-light);">
+          <td colspan="3" style="padding:8px 12px;font-size:12px;font-weight:700;">Total</td>
+          <td style="padding:8px 12px;font-size:12px;font-weight:700;text-align:right;">${fmtNum(matching.reduce((s,r) => s + (Number(r['Qty Sent'])||0), 0))}</td>
+          <td colspan="3"></td>
+        </tr></tfoot>
+      </table>`;
+  }
+
+  popup.style.display = 'flex';
+  document.getElementById('pivot-popup-overlay').style.display = 'block';
+}
+
+function closePivotPopup() {
+  document.getElementById('pivot-popup').style.display = 'none';
+  document.getElementById('pivot-popup-overlay').style.display = 'none';
 }
 
 function clearRawNavFilter() {
@@ -3116,6 +3191,16 @@ async function loadInvTransfer() {
 Promise.all([loadFilterOptions(), loadView('daily-summary')]);
 document.getElementById('last-updated').textContent = 'Loaded ' + new Date().toLocaleTimeString();
 </script>
+
+<!-- ── Pivot cell detail popup ──────────────────────────────────────────── -->
+<div id="pivot-popup-overlay" onclick="closePivotPopup()" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.25);"></div>
+<div id="pivot-popup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--card-bg);border:1px solid var(--border-light);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.22);min-width:660px;max-width:90vw;max-height:80vh;display:none;flex-direction:column;overflow:hidden;">
+  <div style="padding:12px 18px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;background:var(--cream);border-radius:12px 12px 0 0;">
+    <span id="pivot-popup-title" style="font-size:13px;font-weight:700;color:var(--text-700);"></span>
+    <button onclick="closePivotPopup()" style="background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--text-400);padding:0 4px;">&times;</button>
+  </div>
+  <div id="pivot-popup-body" style="overflow:auto;padding:0;"></div>
+</div>
 
 </body>
 </html>

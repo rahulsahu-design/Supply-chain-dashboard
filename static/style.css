@@ -753,6 +753,28 @@ tbody tr.overdue td { color: var(--accent-red); }
 
 .pivot-toggle:hover { background: var(--cream-dark); }
 
+.pivot-prod-link {
+  cursor: pointer;
+  color: var(--text-700);
+  border-bottom: 1px dashed var(--text-400);
+  transition: color 0.15s;
+}
+.pivot-prod-link:hover { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+.pivot-cell-link {
+  cursor: pointer;
+  display: inline-block;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-weight: 600;
+  color: var(--text-700);
+  transition: background 0.15s, color 0.15s;
+}
+.pivot-cell-link:hover {
+  background: #3b82f620;
+  color: #3b82f6;
+}
+
 .detail-toggle {
   cursor: pointer;
   font-size: 11px;
