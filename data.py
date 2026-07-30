@@ -1250,6 +1250,8 @@ AGEING_BUCKET_ORDER = ["0-5", "6-10", "11-20", "21-30", "30+", "31-40", "40+"]
 
 def xindus_tracker(df: pd.DataFrame) -> dict:
     xdf = df[df["Transporter"].str.strip().isin(XINDUS_TRANSPORTERS)].copy()
+    if STATUS_COL in xdf.columns:
+        xdf = xdf[xdf[STATUS_COL].str.strip().isin({"Delivered", "In-Transit"})].copy()
     if xdf.empty:
         return {"kpis": {}, "modes": {}, "in_transit_shipments": [],
                 "ageing_dist": [], "sku_summary": [], "delivered_summary": []}
