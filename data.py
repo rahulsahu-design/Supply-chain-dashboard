@@ -133,7 +133,7 @@ def _do_fetch():
                 parsed[failed] = parsed3
             df[col] = parsed
 
-    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "No. Of box", "Shipment Value", "Total Freight"]:
+    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "No. Of box", "Shipment Value", "Total Freight", "Freight/Kg"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     cw = _chargeable_col(df)
@@ -925,7 +925,15 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
         tat_count = len(del_df)
         on_time_pct = round(float((del_df["Delay Days"] <= 0).sum()) / tat_count * 100, 1) if tat_count > 0 else None
         chargeable = round(float(mdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
-        total_freight = round(float(mdf["Total Freight"].fillna(0).sum()), 2) if "Total Freight" in mdf.columns else 0
+        # Use column BI if populated; fall back to Chargeable Weight × Freight/Kg
+        if "Total Freight" in mdf.columns and pd.to_numeric(mdf["Total Freight"], errors="coerce").sum() > 0:
+            total_freight = round(float(pd.to_numeric(mdf["Total Freight"], errors="coerce").fillna(0).sum()), 2)
+        elif cw_col and "Freight/Kg" in mdf.columns:
+            fkg = pd.to_numeric(mdf["Freight/Kg"], errors="coerce")
+            cw  = pd.to_numeric(mdf[cw_col], errors="coerce")
+            total_freight = round(float((cw * fkg).fillna(0).sum()), 2)
+        else:
+            total_freight = 0
 
         mode_air_pct = mode_air_sea_pct = mode_sea_pct = None
         if mode_col and cw_col and chargeable > 0:
