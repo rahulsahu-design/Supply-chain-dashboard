@@ -1396,7 +1396,7 @@ async function loadDailyTonnage() {
   const tTotalDelivered = tRows.reduce((s, r) => s + r.delivered, 0);
   const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
   const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
-  const tTotalShipVal   = tRows.reduce((s, r) => s + (r.shipment_value || 0), 0);
+  const tTotalFreight   = tRows.reduce((s, r) => s + (r.total_freight || 0), 0);
   const _otBadge  = pct => pct == null ? '—'
     : `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(pct)}%</span>`;
   const _modePct  = pct => pct == null ? '<span style="color:var(--text-300);">—</span>'
@@ -1411,7 +1411,7 @@ async function loadDailyTonnage() {
     <th style="text-align:right;">On Time %</th>
     <th style="text-align:right;">Chargeable Wt (kg)</th>
     <th style="text-align:right;">Units</th>
-    <th style="text-align:right;">Shipment Value ($)</th>
+    <th style="text-align:right;">Total Freight</th>
     ${hasMode ? '<th style="text-align:right;min-width:70px;">Air %</th><th style="text-align:right;min-width:80px;">Air+Sea %</th><th style="text-align:right;min-width:70px;">Sea %</th>' : ''}
   </tr></thead><tbody>`;
   tRows.forEach(r => {
@@ -1423,7 +1423,7 @@ async function loadDailyTonnage() {
       <td style="text-align:right;">${_otBadge(r.on_time_pct)}</td>
       <td style="text-align:right;">${fmtNum(r.vol_wt)}</td>
       <td style="text-align:right;">${fmtNum(r.units)}</td>
-      <td style="text-align:right;">${r.shipment_value > 0 ? '$' + fmtNum(Math.round(r.shipment_value)) : '—'}</td>
+      <td style="text-align:right;">${r.total_freight > 0 ? fmtNum(Math.round(r.total_freight)) : '—'}</td>
       ${hasMode ? `<td style="text-align:right;">${_modePct(r.mode_air_pct)}</td><td style="text-align:right;">${_modePct(r.mode_air_sea_pct)}</td><td style="text-align:right;">${_modePct(r.mode_sea_pct)}</td>` : ''}
     </tr>`;
   });
@@ -1435,7 +1435,7 @@ async function loadDailyTonnage() {
     <td style="text-align:right;">—</td>
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
-    <td style="text-align:right;">${tTotalShipVal > 0 ? '$' + fmtNum(Math.round(tTotalShipVal)) : '—'}</td>
+    <td style="text-align:right;">${tTotalFreight > 0 ? fmtNum(Math.round(tTotalFreight)) : '—'}</td>
     ${hasMode ? '<td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td>' : ''}
   </tr></tfoot></table>`;
   document.getElementById('daily-tonnage-table').innerHTML = th;

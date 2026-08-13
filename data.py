@@ -133,7 +133,7 @@ def _do_fetch():
                 parsed[failed] = parsed3
             df[col] = parsed
 
-    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "No. Of box", "Shipment Value"]:
+    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "No. Of box", "Shipment Value", "Total Freight"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     cw = _chargeable_col(df)
@@ -925,7 +925,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
         tat_count = len(del_df)
         on_time_pct = round(float((del_df["Delay Days"] <= 0).sum()) / tat_count * 100, 1) if tat_count > 0 else None
         chargeable = round(float(mdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
-        shipment_value = round(float(mdf["Shipment Value"].fillna(0).sum()), 2) if "Shipment Value" in mdf.columns else 0
+        total_freight = round(float(mdf["Total Freight"].fillna(0).sum()), 2) if "Total Freight" in mdf.columns else 0
 
         mode_air_pct = mode_air_sea_pct = mode_sea_pct = None
         if mode_col and cw_col and chargeable > 0:
@@ -943,7 +943,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
             "delivered": delivered,
             "on_time_pct": on_time_pct,
             "vol_wt": chargeable,
-            "shipment_value": shipment_value,
+            "total_freight": total_freight,
             "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,
             "boxes": int(mdf["No. Of box"].fillna(0).sum()) if "No. Of box" in mdf.columns else 0,
             "mode_air_pct": mode_air_pct,
