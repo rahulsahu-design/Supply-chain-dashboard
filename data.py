@@ -20,7 +20,7 @@ STATUS_COL = "Current Status - Ship partner portal"
 DELIVERED_STATUSES = {"Delivered"}
 OVERDUE_BUCKETS = {"21-30", "30+", "31-40", "40+"}
 EXCLUDED_UNDELIVERED_STATUSES = {"Delivered", "RTO", "RTS", "Abandon", "Cancelled", "Cancel", "Claims"}
-SCORECARD_EXCLUDE_STATUSES = {"Abandon", "Cancelled", "Cancel", "RTO", "RTS", "Claims"}
+SCORECARD_EXCLUDE_STATUSES = {"Cancelled"}
 TERMINAL_STATUS_GROUPS = [
     ("Abandon",   {"Abandon"}),
     ("Cancelled", {"Cancelled", "Cancel"}),
@@ -303,18 +303,21 @@ def daily_operations_summary(df: pd.DataFrame) -> dict:
     # Exclude cancelled shipments from all counts/cards
     dfc = df[df[STATUS_COL].str.strip() != "Cancelled"].copy() if STATUS_COL in df.columns else df
 
-    total = len(dfc)
-    delivered = int(dfc["is_delivered"].sum())
-    undelivered = int(_active_undelivered_mask(dfc).sum())
-    overdue = int(dfc["is_overdue"].sum())
+    # Deduplicate by Order ID so multi-SKU orders count once
+    dfc_cnt = dfc.drop_duplicates(subset=["Order ID"]).copy() if "Order ID" in dfc.columns else dfc
+
+    total = len(dfc_cnt)
+    delivered = int(dfc_cnt["is_delivered"].sum())
+    undelivered = int(_active_undelivered_mask(dfc_cnt).sum())
+    overdue = int(dfc_cnt["is_overdue"].sum())
 
     # Today's pickups
-    today_pickups = int((dfc["Pick up Date"].dt.date == today).sum()) if "Pick up Date" in dfc.columns else 0
+    today_pickups = int((dfc_cnt["Pick up Date"].dt.date == today).sum()) if "Pick up Date" in dfc_cnt.columns else 0
 
     # This week's deliveries
     week_delivered = int(
-        dfc[dfc["is_delivered"] & (dfc["Actual Delivery Date"].dt.date >= week_start)].shape[0]
-    ) if "Actual Delivery Date" in dfc.columns else 0
+        dfc_cnt[dfc_cnt["is_delivered"] & (dfc_cnt["Actual Delivery Date"].dt.date >= week_start)].shape[0]
+    ) if "Actual Delivery Date" in dfc_cnt.columns else 0
 
     # Status breakdown (keep cancelled visible here for full picture)
     status_counts = (
@@ -323,7 +326,7 @@ def daily_operations_summary(df: pd.DataFrame) -> dict:
     )
 
     # Channel breakdown
-    channel_counts = dfc.groupby("Channel")["is_delivered"].agg(
+    channel_counts = dfc_cnt.groupby("Channel")["is_delivered"].agg(
         delivered="sum", total="count"
     ).reset_index()
     channel_data = channel_counts.to_dict(orient="records")
@@ -790,8 +793,12 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
     df = df[df["Transporter"].notna() & (df["Transporter"].str.strip() != "")].copy()
     if STATUS_COL in df.columns:
         df = df[~df[STATUS_COL].str.strip().isin(SCORECARD_EXCLUDE_STATUSES)]
-    grouped = df.groupby("Transporter").agg(
-        total=("Shipment AWB", "count"),
+
+    # Deduplicate by Order ID per transporter so multi-SKU orders count once
+    df_cnt = df.drop_duplicates(subset=["Order ID"]).copy() if "Order ID" in df.columns else df
+
+    grouped = df_cnt.groupby("Transporter").agg(
+        total=("Order ID", "count"),
         delivered=("is_delivered", "sum"),
         avg_prom_tat=("Prom TAT", "mean"),
     ).reset_index()
@@ -799,7 +806,7 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
     # avg_delay and on_time_pct computed from delivered shipments only — undelivered rows
     # have Delay Days = 0 or negative (shipment not yet late) which falsely shows "On Time"
     # for transporters with no actual deliveries.
-    del_df = df[df["is_delivered"] & df["Delay Days"].notna()].copy()
+    del_df = df_cnt[df_cnt["is_delivered"] & df_cnt["Delay Days"].notna()].copy()
     on_time_grp = del_df.groupby("Transporter").agg(
         on_time=("Delay Days", lambda x: (x <= 0).sum()),
         tat_count=("Delay Days", "count"),
@@ -807,7 +814,7 @@ def transporter_scorecard(df: pd.DataFrame) -> list:
     ).reset_index()
 
     # Weighted average actual TAT of delivered shipments, weighted by units sent
-    del_tat_df = df[df["is_delivered"] & df["Actual TAT"].notna()].copy()
+    del_tat_df = df_cnt[df_cnt["is_delivered"] & df_cnt["Actual TAT"].notna()].copy()
     del_tat_df["_w"] = del_tat_df["Qty Sent"].fillna(1).clip(lower=1) if "Qty Sent" in del_tat_df.columns else 1
     wtd_tat_grp = del_tat_df.groupby("Transporter").apply(
         lambda g: round(float((g["Actual TAT"] * g["_w"]).sum() / g["_w"].sum()), 2)
@@ -925,8 +932,10 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
         mdf = d[d["Month"].astype(str).str.strip() == m]
         if len(mdf) == 0:
             continue
-        delivered = int(mdf["is_delivered"].sum())
-        del_df = mdf[mdf["is_delivered"] & mdf["Delay Days"].notna()]
+        # Deduplicate by Order ID for counts; keep all rows for weight/freight sums
+        mdf_cnt = mdf.drop_duplicates(subset=["Order ID"]).copy() if "Order ID" in mdf.columns else mdf
+        delivered = int(mdf_cnt["is_delivered"].sum())
+        del_df = mdf_cnt[mdf_cnt["is_delivered"] & mdf_cnt["Delay Days"].notna()]
         tat_count = len(del_df)
         on_time_pct = round(float((del_df["Delay Days"] <= 0).sum()) / tat_count * 100, 1) if tat_count > 0 else None
         chargeable = round(float(mdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
@@ -952,7 +961,7 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
 
         rows.append({
             "month": m[:3],
-            "shipments": len(mdf),
+            "shipments": len(mdf_cnt),
             "delivered": delivered,
             "on_time_pct": on_time_pct,
             "vol_wt": chargeable,
