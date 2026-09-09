@@ -300,27 +300,30 @@ def daily_operations_summary(df: pd.DataFrame) -> dict:
     today = datetime.now().date()
     week_start = today - timedelta(days=today.weekday())
 
-    total = len(df)
-    delivered = int(df["is_delivered"].sum())
-    undelivered = int(_active_undelivered_mask(df).sum())
-    overdue = int(df["is_overdue"].sum())
+    # Exclude cancelled shipments from all counts/cards
+    dfc = df[df[STATUS_COL].str.strip() != "Cancelled"].copy() if STATUS_COL in df.columns else df
+
+    total = len(dfc)
+    delivered = int(dfc["is_delivered"].sum())
+    undelivered = int(_active_undelivered_mask(dfc).sum())
+    overdue = int(dfc["is_overdue"].sum())
 
     # Today's pickups
-    today_pickups = int((df["Pick up Date"].dt.date == today).sum()) if "Pick up Date" in df.columns else 0
+    today_pickups = int((dfc["Pick up Date"].dt.date == today).sum()) if "Pick up Date" in dfc.columns else 0
 
     # This week's deliveries
     week_delivered = int(
-        df[df["is_delivered"] & (df["Actual Delivery Date"].dt.date >= week_start)].shape[0]
-    ) if "Actual Delivery Date" in df.columns else 0
+        dfc[dfc["is_delivered"] & (dfc["Actual Delivery Date"].dt.date >= week_start)].shape[0]
+    ) if "Actual Delivery Date" in dfc.columns else 0
 
-    # Status breakdown
+    # Status breakdown (keep cancelled visible here for full picture)
     status_counts = (
         df[STATUS_COL].str.strip().value_counts().to_dict()
         if STATUS_COL in df.columns else {}
     )
 
     # Channel breakdown
-    channel_counts = df.groupby("Channel")["is_delivered"].agg(
+    channel_counts = dfc.groupby("Channel")["is_delivered"].agg(
         delivered="sum", total="count"
     ).reset_index()
     channel_data = channel_counts.to_dict(orient="records")
@@ -909,6 +912,8 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
     MONTHS = ["January","February","March","April","May","June",
               "July","August","September","October","November","December"]
     d = df.copy()
+    if STATUS_COL in d.columns:
+        d = d[d[STATUS_COL].str.strip() != "Cancelled"]
     if transporters:
         d = d[d["Transporter"].str.strip().isin(transporters)]
     cw_col   = _chargeable_col(d)
