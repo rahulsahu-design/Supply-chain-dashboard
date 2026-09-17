@@ -181,8 +181,16 @@
 
       <!-- Monthly Transporter Breakdown -->
       <div class="card" style="padding:0;overflow:hidden;margin-top:24px;">
-        <div style="padding:8px 14px;border-bottom:1px solid var(--border-light);">
+        <div style="padding:8px 14px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Breakdown by Transporter</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;">
+            <select id="mtb-month-filter" style="font-size:11px;padding:3px 8px;border:1px solid var(--border-light);border-radius:4px;background:var(--bg-card);color:var(--text-700);cursor:pointer;">
+              <option value="All">All Months</option>
+            </select>
+            <select id="mtb-transporter-filter" style="font-size:11px;padding:3px 8px;border:1px solid var(--border-light);border-radius:4px;background:var(--bg-card);color:var(--text-700);cursor:pointer;">
+              <option value="All">All Transporters</option>
+            </select>
+          </div>
         </div>
         <div id="monthly-transporter-table" style="overflow-x:auto;">
           <div class="loading-state"><div class="spinner"></div> Loading…</div>
@@ -1458,12 +1466,51 @@ async function loadDailyTonnage() {
 async function loadMonthlyTransporterBreakdown() {
   const el = document.getElementById('monthly-transporter-table');
   if (!el) return;
+
+  // Always fetch (apiFetch client cache handles dedup within 10 min)
   el.innerHTML = '<div class="loading-state" style="padding:20px;"><div class="spinner"></div> Loading…</div>';
   const res = await apiFetch('/api/monthly-transporter-breakdown');
   const data = await res.json();
-  const rows = data.rows || [];
+  window._mtbAllRows = data.rows || [];
+
+  // Populate filter dropdowns (skip if already populated)
+  const monthSel = document.getElementById('mtb-month-filter');
+  const transpSel = document.getElementById('mtb-transporter-filter');
+  if (monthSel && monthSel.options.length <= 1) {
+    const months = [...new Set(window._mtbAllRows.map(r => r.month))];
+    months.forEach(m => {
+      const o = document.createElement('option'); o.value = m; o.textContent = m;
+      monthSel.appendChild(o);
+    });
+    monthSel.addEventListener('change', _renderMTB);
+  }
+  if (transpSel && transpSel.options.length <= 1) {
+    const transporters = [...new Set(window._mtbAllRows.map(r => r.transporter))].sort();
+    transporters.forEach(t => {
+      const o = document.createElement('option'); o.value = t; o.textContent = t;
+      transpSel.appendChild(o);
+    });
+    transpSel.addEventListener('change', _renderMTB);
+  }
+
+  _renderMTB();
+}
+
+function _renderMTB() {
+  const el = document.getElementById('monthly-transporter-table');
+  if (!el || !window._mtbAllRows) return;
+
+  const monthSel = document.getElementById('mtb-month-filter');
+  const transpSel = document.getElementById('mtb-transporter-filter');
+  const selMonth = monthSel ? monthSel.value : 'All';
+  const selTransp = transpSel ? transpSel.value : 'All';
+
+  let rows = window._mtbAllRows;
+  if (selMonth !== 'All') rows = rows.filter(r => r.month === selMonth);
+  if (selTransp !== 'All') rows = rows.filter(r => r.transporter === selTransp);
+
   if (!rows.length) {
-    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-400);font-size:13px;">No data</div>';
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-400);font-size:13px;">No data for selected filters</div>';
     return;
   }
 
@@ -1506,22 +1553,24 @@ async function loadMonthlyTransporterBreakdown() {
         <td style="text-align:right;font-weight:600;">${_tat(r.wtd_avg_tat)}</td>
       </tr>`;
     });
-    // Month subtotal row
-    const totShip = mRows.reduce((s, r) => s + r.shipments, 0);
-    const totCW   = mRows.reduce((s, r) => s + r.chargeable_weight, 0);
-    const totUnits= mRows.reduce((s, r) => s + r.units, 0);
-    const totTATRows = mRows.filter(r => r.wtd_avg_tat != null);
-    const avgTAT = totTATRows.length
-      ? (totTATRows.reduce((s, r) => s + r.wtd_avg_tat * r.shipments, 0) / totTATRows.reduce((s, r) => s + r.shipments, 0)).toFixed(1)
-      : null;
-    html += `<tr style="background:var(--bg-row-alt);font-weight:700;font-size:12px;color:var(--text-500);">
-      <td colspan="2" style="font-style:italic;padding-left:24px;">${m} Total</td>
-      <td style="text-align:right;">${fmtNum(totShip)}</td>
-      <td style="text-align:right;">${fmtNum(Math.round(totCW * 10) / 10)}</td>
-      <td style="text-align:right;">${fmtNum(totUnits)}</td>
-      <td colspan="3" style="text-align:center;">—</td>
-      <td style="text-align:right;">${avgTAT ? avgTAT + 'd' : '—'}</td>
-    </tr>`;
+    // Month subtotal row (only when multiple transporters visible)
+    if (mRows.length > 1 || selTransp === 'All') {
+      const totShip  = mRows.reduce((s, r) => s + r.shipments, 0);
+      const totCW    = mRows.reduce((s, r) => s + r.chargeable_weight, 0);
+      const totUnits = mRows.reduce((s, r) => s + r.units, 0);
+      const totTATRows = mRows.filter(r => r.wtd_avg_tat != null);
+      const avgTAT = totTATRows.length
+        ? (totTATRows.reduce((s, r) => s + r.wtd_avg_tat * r.shipments, 0) / totTATRows.reduce((s, r) => s + r.shipments, 0)).toFixed(1)
+        : null;
+      html += `<tr style="background:var(--bg-row-alt);font-weight:700;font-size:12px;color:var(--text-500);">
+        <td colspan="2" style="font-style:italic;padding-left:24px;">${m} Total</td>
+        <td style="text-align:right;">${fmtNum(totShip)}</td>
+        <td style="text-align:right;">${fmtNum(Math.round(totCW * 10) / 10)}</td>
+        <td style="text-align:right;">${fmtNum(totUnits)}</td>
+        <td colspan="3" style="text-align:center;">—</td>
+        <td style="text-align:right;">${avgTAT ? avgTAT + 'd' : '—'}</td>
+      </tr>`;
+    }
   });
 
   html += '</tbody></table>';
