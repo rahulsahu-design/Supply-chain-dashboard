@@ -153,6 +153,11 @@ def api_monthly_shipment_value():
     return jsonify(d.monthly_shipment_value(_filtered_df()))
 
 
+@app.route("/api/monthly-transporter-breakdown")
+def api_monthly_transporter_breakdown():
+    return jsonify(d.monthly_transporter_breakdown(_filtered_df()))
+
+
 @app.route("/api/tonnage")
 def api_tonnage():
     transporters_raw = request.args.get("transporters", "All")

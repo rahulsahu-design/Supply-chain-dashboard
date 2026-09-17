@@ -179,6 +179,16 @@
         </div>
       </div>
 
+      <!-- Monthly Transporter Breakdown -->
+      <div class="card" style="padding:0;overflow:hidden;margin-top:24px;">
+        <div style="padding:8px 14px;border-bottom:1px solid var(--border-light);">
+          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Breakdown by Transporter</span>
+        </div>
+        <div id="monthly-transporter-table" style="overflow-x:auto;">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
       <!-- Transporter Scorecard -->
       <div class="card" style="padding:0;overflow:hidden;margin-top:24px;margin-bottom:24px;">
         <div style="padding:11px 20px;border-bottom:1px solid var(--border-light);">
@@ -1334,6 +1344,9 @@ async function loadSummary() {
   // Tonnage summary table beside Status Breakdown
   await loadDailyTonnage();
 
+  // Monthly breakdown by transporter
+  loadMonthlyTransporterBreakdown();
+
   // Transporter Scorecard
   try {
     const scRes = await apiFetch('/api/scorecard');
@@ -1439,6 +1452,80 @@ async function loadDailyTonnage() {
     ${hasMode ? '<td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td>' : ''}
   </tr></tfoot></table>`;
   document.getElementById('daily-tonnage-table').innerHTML = th;
+}
+
+// ── Monthly Transporter Breakdown ───────────────────────────────────────────
+async function loadMonthlyTransporterBreakdown() {
+  const el = document.getElementById('monthly-transporter-table');
+  if (!el) return;
+  el.innerHTML = '<div class="loading-state" style="padding:20px;"><div class="spinner"></div> Loading…</div>';
+  const res = await apiFetch('/api/monthly-transporter-breakdown');
+  const data = await res.json();
+  const rows = data.rows || [];
+  if (!rows.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-400);font-size:13px;">No data</div>';
+    return;
+  }
+
+  const _pct = v => v == null ? '—' : `${v}%`;
+  const _tat = v => v == null ? '—' : `${v}d`;
+
+  // Group rows by month to apply rowspan
+  const byMonth = {};
+  rows.forEach(r => { (byMonth[r.month] = byMonth[r.month] || []).push(r); });
+
+  let html = `<table class="data-table" style="min-width:900px;">
+  <thead><tr>
+    <th>Month</th>
+    <th>Transporter</th>
+    <th style="text-align:right;">Shipments</th>
+    <th style="text-align:right;">Chargeable Wt (kg)</th>
+    <th style="text-align:right;">Units</th>
+    <th style="text-align:right;">Air %</th>
+    <th style="text-align:right;">Air+Sea %</th>
+    <th style="text-align:right;">Sea %</th>
+    <th style="text-align:right;">Wtd Avg TAT</th>
+  </tr></thead><tbody>`;
+
+  const months = [...new Set(rows.map(r => r.month))];
+  months.forEach(m => {
+    const mRows = byMonth[m];
+    mRows.forEach((r, idx) => {
+      const monthCell = idx === 0
+        ? `<td rowspan="${mRows.length}" style="font-weight:700;vertical-align:middle;border-right:1px solid var(--border-light);">${m}</td>`
+        : '';
+      html += `<tr>
+        ${monthCell}
+        <td>${r.transporter}</td>
+        <td style="text-align:right;">${fmtNum(r.shipments)}</td>
+        <td style="text-align:right;">${fmtNum(r.chargeable_weight)}</td>
+        <td style="text-align:right;">${fmtNum(r.units)}</td>
+        <td style="text-align:right;">${_pct(r.air_pct)}</td>
+        <td style="text-align:right;">${_pct(r.air_sea_pct)}</td>
+        <td style="text-align:right;">${_pct(r.sea_pct)}</td>
+        <td style="text-align:right;font-weight:600;">${_tat(r.wtd_avg_tat)}</td>
+      </tr>`;
+    });
+    // Month subtotal row
+    const totShip = mRows.reduce((s, r) => s + r.shipments, 0);
+    const totCW   = mRows.reduce((s, r) => s + r.chargeable_weight, 0);
+    const totUnits= mRows.reduce((s, r) => s + r.units, 0);
+    const totTATRows = mRows.filter(r => r.wtd_avg_tat != null);
+    const avgTAT = totTATRows.length
+      ? (totTATRows.reduce((s, r) => s + r.wtd_avg_tat * r.shipments, 0) / totTATRows.reduce((s, r) => s + r.shipments, 0)).toFixed(1)
+      : null;
+    html += `<tr style="background:var(--bg-row-alt);font-weight:700;font-size:12px;color:var(--text-500);">
+      <td colspan="2" style="font-style:italic;padding-left:24px;">${m} Total</td>
+      <td style="text-align:right;">${fmtNum(totShip)}</td>
+      <td style="text-align:right;">${fmtNum(Math.round(totCW * 10) / 10)}</td>
+      <td style="text-align:right;">${fmtNum(totUnits)}</td>
+      <td colspan="3" style="text-align:center;">—</td>
+      <td style="text-align:right;">${avgTAT ? avgTAT + 'd' : '—'}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
 // ── Period quick-select helper ──────────────────────────────────────────────

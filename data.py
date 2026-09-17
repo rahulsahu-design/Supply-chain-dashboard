@@ -978,6 +978,64 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
     return {"rows": rows, "transporters": all_transporters, "all_months": all_months}
 
 
+def monthly_transporter_breakdown(df: pd.DataFrame) -> dict:
+    MONTHS = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"]
+    if STATUS_COL in df.columns:
+        df = df[df[STATUS_COL].str.strip() != "Cancelled"].copy()
+    cw_col   = _chargeable_col(df)
+    mode_col = _mode_col(df)
+    plat_col = "Platform Label Number / IBR Number"
+
+    rows = []
+    for m in MONTHS:
+        mdf = df[df["Month"].astype(str).str.strip() == m]
+        if len(mdf) == 0:
+            continue
+        for transporter, tdf in mdf.groupby("Transporter"):
+            if not transporter or str(transporter).strip() == "":
+                continue
+            # Unique shipments by (Platform Label, Order ID)
+            if plat_col in tdf.columns and "Order ID" in tdf.columns:
+                shipments = tdf[[plat_col, "Order ID"]].drop_duplicates().shape[0]
+            elif "Order ID" in tdf.columns:
+                shipments = tdf["Order ID"].nunique()
+            else:
+                shipments = len(tdf)
+
+            # Weight and units — sum all rows (each row may be a different SKU line)
+            chargeable = round(float(tdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
+            units = int(tdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in tdf.columns else 0
+
+            # Mode % based on chargeable weight
+            air_pct = air_sea_pct = sea_pct = None
+            if mode_col and cw_col and chargeable > 0:
+                mode_norm = tdf[mode_col].astype(str).str.strip().str.lower().str.replace(r'\s*\+\s*', '+', regex=True)
+                air_pct     = round(float(tdf[mode_norm == 'air'][cw_col].fillna(0).sum()) / chargeable * 100, 1)
+                air_sea_pct = round(float(tdf[mode_norm == 'air+sea'][cw_col].fillna(0).sum()) / chargeable * 100, 1)
+                sea_pct     = round(float(tdf[mode_norm == 'sea'][cw_col].fillna(0).sum()) / chargeable * 100, 1)
+
+            # Weighted avg actual TAT for delivered shipments only, weighted by units
+            del_tdf = tdf[tdf["is_delivered"] & tdf["Actual TAT"].notna()].copy()
+            wtd_avg_tat = None
+            if len(del_tdf) > 0:
+                w = del_tdf["Qty Sent"].fillna(1).clip(lower=1) if "Qty Sent" in del_tdf.columns else pd.Series([1] * len(del_tdf))
+                wtd_avg_tat = round(float((del_tdf["Actual TAT"] * w).sum() / w.sum()), 1)
+
+            rows.append({
+                "month": m[:3],
+                "transporter": str(transporter).strip(),
+                "shipments": shipments,
+                "chargeable_weight": chargeable,
+                "units": units,
+                "air_pct": air_pct,
+                "air_sea_pct": air_sea_pct,
+                "sea_pct": sea_pct,
+                "wtd_avg_tat": wtd_avg_tat,
+            })
+    return {"rows": rows}
+
+
 def channel_health(df: pd.DataFrame) -> list:
     channels = ["Amazon", "TikTok", "Shipbob"]
     result = []
