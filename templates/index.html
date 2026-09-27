@@ -181,17 +181,25 @@
 
       <!-- Monthly Transporter Breakdown -->
       <div class="card" style="padding:0;overflow:hidden;margin-top:24px;">
-        <div style="padding:8px 14px 0;border-bottom:1px solid var(--border-light);">
-          <div style="margin-bottom:6px;">
-            <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Breakdown by Transporter</span>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
-            <span style="font-size:10px;font-weight:600;color:var(--text-500);padding-top:4px;white-space:nowrap;min-width:52px;">Month:</span>
-            <div id="mtb-month-pills" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
-            <span style="font-size:10px;font-weight:600;color:var(--text-500);padding-top:4px;white-space:nowrap;min-width:52px;">Transporter:</span>
-            <div id="mtb-transporter-pills" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        <div style="padding:8px 14px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:10px;font-weight:700;color:var(--text-600);text-transform:uppercase;letter-spacing:0.8px;">Monthly Breakdown by Transporter</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;">
+            <div class="ms-dropdown" id="ms-mtb-month" data-all-label="All Months" style="min-width:130px;">
+              <button class="ms-trigger" type="button" onclick="toggleMs('ms-mtb-month')" style="font-size:11px;padding:4px 10px;">
+                <span class="ms-label">All Months</span><span class="ms-caret">▾</span>
+              </button>
+              <div class="ms-panel" id="ms-mtb-month-panel">
+                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mtb-month',this);_renderMTB()" checked> All</label>
+              </div>
+            </div>
+            <div class="ms-dropdown" id="ms-mtb-transporter" data-all-label="All Transporters" style="min-width:160px;">
+              <button class="ms-trigger" type="button" onclick="toggleMs('ms-mtb-transporter')" style="font-size:11px;padding:4px 10px;">
+                <span class="ms-label">All Transporters</span><span class="ms-caret">▾</span>
+              </button>
+              <div class="ms-panel" id="ms-mtb-transporter-panel">
+                <label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('ms-mtb-transporter',this);_renderMTB()" checked> All</label>
+              </div>
+            </div>
           </div>
         </div>
         <div id="monthly-transporter-table" style="overflow-x:auto;">
@@ -1477,75 +1485,32 @@ async function loadMonthlyTransporterBreakdown() {
   const allMonths      = [...new Set(window._mtbAllRows.map(r => r.month))];
   const allTransporters = [...new Set(window._mtbAllRows.map(r => r.transporter))].sort();
 
-  // Start with everything selected
-  window._mtbSelMonths       = new Set(allMonths);
-  window._mtbSelTransporters = new Set(allTransporters);
-
-  _buildMTBPills('mtb-month-pills',       allMonths,       window._mtbSelMonths,       allMonths);
-  _buildMTBPills('mtb-transporter-pills', allTransporters, window._mtbSelTransporters, allTransporters);
+  _populateMTBDropdown('ms-mtb-month', 'ms-mtb-month-panel', allMonths, m => m);
+  _populateMTBDropdown('ms-mtb-transporter', 'ms-mtb-transporter-panel', allTransporters, t => t);
 
   _renderMTB();
 }
 
-function _buildMTBPills(containerId, items, selSet, allItems) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = '';
-
-  // "All" reset button
-  const allBtn = document.createElement('button');
-  allBtn.textContent = 'All';
-  allBtn.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;cursor:pointer;margin:2px;border:1px solid transparent;background:#3b82f6;color:#fff;';
-  allBtn.addEventListener('click', () => {
-    allItems.forEach(v => selSet.add(v));
-    _syncMTBPills(container, selSet);
-    allBtn.style.background = '#3b82f6';
-    allBtn.style.color = '#fff';
-    _renderMTB();
-  });
-  container.appendChild(allBtn);
-
+function _populateMTBDropdown(dropdownId, panelId, items, labelFn) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  panel.innerHTML = `<label class="ms-option"><input type="checkbox" value="__all__" onchange="msAllToggle('${dropdownId}',this);_renderMTB()" checked> All</label>`;
   items.forEach(item => {
-    const btn = document.createElement('button');
-    btn.textContent = item;
-    btn.dataset.value = item;
-    btn.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;cursor:pointer;margin:2px;border:1px solid var(--border-light);transition:background 0.12s,color 0.12s;';
-    _setPillActive(btn, selSet.has(item));
-    btn.addEventListener('click', () => {
-      if (selSet.has(item)) { selSet.delete(item); } else { selSet.add(item); }
-      _setPillActive(btn, selSet.has(item));
-      // Dim "All" button when not everything is selected
-      allBtn.style.background = selSet.size === allItems.length ? '#3b82f6' : 'var(--bg-card)';
-      allBtn.style.color      = selSet.size === allItems.length ? '#fff'    : 'var(--text-500)';
-      allBtn.style.border     = selSet.size === allItems.length ? '1px solid transparent' : '1px solid var(--border-light)';
-      _renderMTB();
-    });
-    container.appendChild(btn);
+    panel.innerHTML += `<label class="ms-option"><input type="checkbox" value="${escHtml(item)}" onchange="msItemToggle('${dropdownId}',this);_renderMTB()"> ${escHtml(labelFn(item))}</label>`;
   });
-}
-
-function _setPillActive(btn, active) {
-  btn.style.background   = active ? '#3b82f6'              : 'var(--bg-card)';
-  btn.style.color        = active ? '#fff'                  : 'var(--text-500)';
-  btn.style.borderColor  = active ? 'transparent'           : 'var(--border-light)';
-}
-
-function _syncMTBPills(container, selSet) {
-  container.querySelectorAll('button[data-value]').forEach(btn => {
-    _setPillActive(btn, selSet.has(btn.dataset.value));
-  });
+  updateMsLabel(dropdownId);
 }
 
 function _renderMTB() {
   const el = document.getElementById('monthly-transporter-table');
   if (!el || !window._mtbAllRows) return;
 
-  const selM = window._mtbSelMonths;
-  const selT = window._mtbSelTransporters;
+  const selM = getMsValues('ms-mtb-month');
+  const selT = getMsValues('ms-mtb-transporter');
 
   let rows = window._mtbAllRows;
-  if (selM && selM.size > 0) rows = rows.filter(r => selM.has(r.month));
-  if (selT && selT.size > 0) rows = rows.filter(r => selT.has(r.transporter));
+  if (selM.length) rows = rows.filter(r => selM.includes(r.month));
+  if (selT.length) rows = rows.filter(r => selT.includes(r.transporter));
 
   if (!rows.length) {
     el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-400);font-size:13px;">No data for selected filters</div>';
