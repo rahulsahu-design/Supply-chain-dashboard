@@ -1573,6 +1573,35 @@ function _renderMTB() {
     }
   });
 
+  const totalShipments = rows.reduce((s, r) => s + (Number(r.shipments) || 0), 0);
+  const totalCW        = rows.reduce((s, r) => s + (Number(r.chargeable_weight) || 0), 0);
+  const totalUnits     = rows.reduce((s, r) => s + (Number(r.units) || 0), 0);
+  const avgMetric = key => {
+    const vals = rows
+      .map(r => r[key])
+      .filter(v => v != null && !Number.isNaN(Number(v)))
+      .map(v => Number(v));
+    return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : null;
+  };
+  const tatRows = rows.filter(r => r.wtd_avg_tat != null && !Number.isNaN(Number(r.wtd_avg_tat)) && (Number(r.shipments) || 0) > 0);
+  const totalAvgTAT = tatRows.length
+    ? (tatRows.reduce((s, r) => s + Number(r.wtd_avg_tat) * (Number(r.shipments) || 0), 0) / tatRows.reduce((s, r) => s + (Number(r.shipments) || 0), 0)).toFixed(1)
+    : null;
+  const avgAir    = avgMetric('air_pct');
+  const avgAirSea = avgMetric('air_sea_pct');
+  const avgSea    = avgMetric('sea_pct');
+
+  html += `<tr style="background:var(--cream);font-weight:800;border-top:2px solid var(--border);color:var(--text-700);">
+    <td colspan="2" style="font-style:italic;padding-left:24px;">Grand Total</td>
+    <td style="text-align:right;">${fmtNum(totalShipments)}</td>
+    <td style="text-align:right;">${fmtNum(Math.round(totalCW * 10) / 10)}</td>
+    <td style="text-align:right;">${fmtNum(totalUnits)}</td>
+    <td style="text-align:right;">${avgAir != null ? avgAir + '%' : '-'}</td>
+    <td style="text-align:right;">${avgAirSea != null ? avgAirSea + '%' : '-'}</td>
+    <td style="text-align:right;">${avgSea != null ? avgSea + '%' : '-'}</td>
+    <td style="text-align:right;">${totalAvgTAT != null ? totalAvgTAT + 'd' : '-'}</td>
+  </tr>`;
+
   html += '</tbody></table>';
   el.innerHTML = html;
 }
