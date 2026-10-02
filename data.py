@@ -950,14 +950,24 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
             total_freight = 0
 
         mode_air_pct = mode_air_sea_pct = mode_sea_pct = None
+        air_wt = air_sea_wt = sea_wt = 0.0
         if mode_col and cw_col and chargeable > 0:
-            mode_norm = mdf[mode_col].astype(str).str.strip().str.lower().str.replace(r'\s*\+\s*', '+', regex=True)
-            air_wt     = float(mdf[mode_norm == 'air'][cw_col].fillna(0).sum())
-            air_sea_wt = float(mdf[mode_norm == 'air+sea'][cw_col].fillna(0).sum())
-            sea_wt     = float(mdf[mode_norm == 'sea'][cw_col].fillna(0).sum())
-            mode_air_pct     = round(air_wt / chargeable * 100, 1)
-            mode_air_sea_pct = round(air_sea_wt / chargeable * 100, 1)
-            mode_sea_pct     = round(sea_wt / chargeable * 100, 1)
+            mode_norm = (
+                mdf[mode_col]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .str.replace(r'\s*\+\s*', '+', regex=True)
+            )
+            cw_vals    = pd.to_numeric(mdf[cw_col], errors="coerce").fillna(0)
+            air_wt     = float(cw_vals[mode_norm == 'air'].sum())
+            air_sea_wt = float(cw_vals[mode_norm == 'air+sea'].sum())
+            sea_wt     = float(cw_vals[mode_norm == 'sea'].sum())
+            mode_total = air_wt + air_sea_wt + sea_wt
+            if mode_total > 0:
+                mode_air_pct     = round(air_wt / mode_total * 100, 1)
+                mode_air_sea_pct = round(air_sea_wt / mode_total * 100, 1)
+                mode_sea_pct     = round(sea_wt / mode_total * 100, 1)
 
         rows.append({
             "month": m[:3],
@@ -971,6 +981,9 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
             "mode_air_pct": mode_air_pct,
             "mode_air_sea_pct": mode_air_sea_pct,
             "mode_sea_pct": mode_sea_pct,
+            "mode_air_wt": round(air_wt, 1),
+            "mode_air_sea_wt": round(air_sea_wt, 1),
+            "mode_sea_wt": round(sea_wt, 1),
         })
     all_transporters = sorted(
         df["Transporter"].dropna().str.strip().replace("", pd.NA).dropna().unique().tolist()

@@ -1428,6 +1428,13 @@ async function loadDailyTonnage() {
   const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
   const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
   const tTotalFreight   = tRows.reduce((s, r) => s + (r.total_freight || 0), 0);
+  const tAirWt          = tRows.reduce((s, r) => s + (Number(r.mode_air_wt) || 0), 0);
+  const tAirSeaWt       = tRows.reduce((s, r) => s + (Number(r.mode_air_sea_wt) || 0), 0);
+  const tSeaWt          = tRows.reduce((s, r) => s + (Number(r.mode_sea_wt) || 0), 0);
+  const tModeWt         = tAirWt + tAirSeaWt + tSeaWt;
+  const tAirPct         = tModeWt > 0 ? tAirWt / tModeWt * 100 : null;
+  const tAirSeaPct      = tModeWt > 0 ? tAirSeaWt / tModeWt * 100 : null;
+  const tSeaPct         = tModeWt > 0 ? tSeaWt / tModeWt * 100 : null;
   const _otBadge  = pct => pct == null ? '—'
     : `<span class="badge ${pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-orange' : 'badge-red'}">${fmtFloat(pct)}%</span>`;
   const _modePct  = pct => pct == null ? '<span style="color:var(--text-300);">—</span>'
@@ -1467,7 +1474,7 @@ async function loadDailyTonnage() {
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
     <td style="text-align:right;">${tTotalFreight > 0 ? fmtNum(Math.round(tTotalFreight)) : '—'}</td>
-    ${hasMode ? '<td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td>' : ''}
+    ${hasMode ? `<td style="text-align:right;">${_modePct(tAirPct)}</td><td style="text-align:right;">${_modePct(tAirSeaPct)}</td><td style="text-align:right;">${_modePct(tSeaPct)}</td>` : ''}
   </tr></tfoot></table>`;
   document.getElementById('daily-tonnage-table').innerHTML = th;
 }
