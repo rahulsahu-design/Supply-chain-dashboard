@@ -937,7 +937,8 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
         delivered = int(mdf_cnt["is_delivered"].sum())
         del_df = mdf_cnt[mdf_cnt["is_delivered"] & mdf_cnt["Delay Days"].notna()]
         tat_count = len(del_df)
-        on_time_pct = round(float((del_df["Delay Days"] <= 0).sum()) / tat_count * 100, 1) if tat_count > 0 else None
+        on_time_count = int((del_df["Delay Days"] <= 0).sum()) if tat_count > 0 else 0
+        on_time_pct = round(float(on_time_count) / tat_count * 100, 1) if tat_count > 0 else None
         chargeable = round(float(mdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
         # Use column BI if populated; fall back to Chargeable Weight × Freight/Kg
         if "Total Freight" in mdf.columns and pd.to_numeric(mdf["Total Freight"], errors="coerce").sum() > 0:
@@ -974,6 +975,8 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
             "shipments": len(mdf_cnt),
             "delivered": delivered,
             "on_time_pct": on_time_pct,
+            "on_time_count": on_time_count,
+            "tat_count": tat_count,
             "vol_wt": chargeable,
             "total_freight": total_freight,
             "units": int(mdf["Qty Sent"].fillna(0).sum()) if "Qty Sent" in mdf.columns else 0,

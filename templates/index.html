@@ -1428,6 +1428,9 @@ async function loadDailyTonnage() {
   const tTotalVolWt     = tRows.reduce((s, r) => s + r.vol_wt, 0);
   const tTotalUnits     = tRows.reduce((s, r) => s + r.units, 0);
   const tTotalFreight   = tRows.reduce((s, r) => s + (r.total_freight || 0), 0);
+  const tOnTimeCount    = tRows.reduce((s, r) => s + (Number(r.on_time_count) || 0), 0);
+  const tTatCount       = tRows.reduce((s, r) => s + (Number(r.tat_count) || 0), 0);
+  const tOnTimePct      = tTatCount > 0 ? tOnTimeCount / tTatCount * 100 : null;
   const tAirWt          = tRows.reduce((s, r) => s + (Number(r.mode_air_wt) || 0), 0);
   const tAirSeaWt       = tRows.reduce((s, r) => s + (Number(r.mode_air_sea_wt) || 0), 0);
   const tSeaWt          = tRows.reduce((s, r) => s + (Number(r.mode_sea_wt) || 0), 0);
@@ -1470,7 +1473,7 @@ async function loadDailyTonnage() {
     <td style="text-align:right;">${fmtNum(tTotalShipments)}</td>
     <td style="text-align:right;">${fmtNum(tTotalDelivered)}</td>
     <td style="text-align:right;">${_drBadge(tTotalDelivered, tTotalShipments)}</td>
-    <td style="text-align:right;">—</td>
+    <td style="text-align:right;">${_otBadge(tOnTimePct)}</td>
     <td style="text-align:right;">${fmtNum(tTotalVolWt)}</td>
     <td style="text-align:right;">${fmtNum(tTotalUnits)}</td>
     <td style="text-align:right;">${tTotalFreight > 0 ? fmtNum(Math.round(tTotalFreight)) : '—'}</td>
