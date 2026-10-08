@@ -113,6 +113,10 @@ def _do_fetch():
 
     df = pd.DataFrame(data_rows, columns=headers)
     df = df.loc[:, df.columns != '']
+    if "Transporter" not in df.columns and "Carrier" in df.columns:
+        # The source sheet currently names the freight partner column "Carrier".
+        # Keep a Transporter alias for dashboard sections that already use that label.
+        df["Transporter"] = df["Carrier"]
 
     date_cols = ["Pick up Date", "Actual Delivery Date", "Expected Delivery Date"]
     for col in date_cols:
@@ -133,7 +137,7 @@ def _do_fetch():
                 parsed[failed] = parsed3
             df[col] = parsed
 
-    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "No. Of box", "Shipment Value", "Total Freight", "Freight/Kg"]:
+    for col in ["Actual TAT", "Prom TAT", "Delay Days", "Ageing", "Qty Sent", "No. Of box", "Shipment Value", "Total Freight", "Total Freight (र)", "Freight/Kg"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     cw = _chargeable_col(df)
@@ -689,6 +693,8 @@ def _year_mask(df: pd.DataFrame, year_val: int):
 def raw_data_2026(df: pd.DataFrame) -> dict:
     _INTERNAL = {'is_delivered', 'is_overdue', '_month_eff'}
     d = df[_year_mask(df, 2026)].copy()
+    if "Carrier" in d.columns and "Transporter" in d.columns:
+        _INTERNAL.add("Transporter")
     # Use the sheet's natural column order; strip computed/internal columns
     cols = [c for c in d.columns if not c.startswith('_') and c not in _INTERNAL]
     out = d[cols].copy()
@@ -941,8 +947,9 @@ def tonnage_report(df: pd.DataFrame, transporters=None, months=None) -> dict:
         on_time_pct = round(float(on_time_count) / tat_count * 100, 1) if tat_count > 0 else None
         chargeable = round(float(mdf[cw_col].fillna(0).sum()), 1) if cw_col else 0
         # Use column BI if populated; fall back to Chargeable Weight × Freight/Kg
-        if "Total Freight" in mdf.columns and pd.to_numeric(mdf["Total Freight"], errors="coerce").sum() > 0:
-            total_freight = round(float(pd.to_numeric(mdf["Total Freight"], errors="coerce").fillna(0).sum()), 2)
+        total_freight_col = "Total Freight" if "Total Freight" in mdf.columns else ("Total Freight (र)" if "Total Freight (र)" in mdf.columns else None)
+        if total_freight_col and pd.to_numeric(mdf[total_freight_col], errors="coerce").sum() > 0:
+            total_freight = round(float(pd.to_numeric(mdf[total_freight_col], errors="coerce").fillna(0).sum()), 2)
         elif cw_col and "Freight/Kg" in mdf.columns:
             fkg = pd.to_numeric(mdf["Freight/Kg"], errors="coerce")
             cw  = pd.to_numeric(mdf[cw_col], errors="coerce")
